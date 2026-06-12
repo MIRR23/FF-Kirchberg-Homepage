@@ -43,14 +43,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const data = await res.json();
     setToken(data.token);
     setUser(data.user);
-    (window as any).__ffk_token = data.token;
   }, []);
 
   const logout = useCallback(() => {
     const t = token;
     setToken(null);
     setUser(null);
-    (window as any).__ffk_token = null;
     if (t) {
       fetch(`${API_BASE}/api/auth/logout`, {
         method: "POST",

@@ -5,6 +5,8 @@ import path from "node:path";
 import fs from "node:fs";
 import multer from "multer";
 import sharp from "sharp";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import { storage } from "./storage";
 import {
   insertPostSchema, insertEventSchema, insertVehicleSchema,
@@ -63,10 +65,20 @@ function uniquePostSlug(base: string, excludeId?: number): string {
 
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+  app.set("trust proxy", 1); // hinter Reverse-Proxy (X-Forwarded-For) korrekt arbeiten
+  app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: false }));
   app.use("/uploads", express.static(UPLOAD_DIR, { maxAge: "7d" }));
 
+  const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { message: "Zu viele Anmeldeversuche. Bitte in 15 Minuten erneut versuchen." },
+  });
+
   // ---------- AUTH ----------
-  app.post("/api/auth/login", (req, res) => {
+  app.post("/api/auth/login", loginLimiter, (req, res) => {
     const { username, password } = req.body ?? {};
     if (!username || !password) return res.status(400).json({ message: "Benutzername und Passwort erforderlich" });
     const user = storage.getUserByUsername(String(username).toLowerCase().trim());
@@ -296,18 +308,27 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.post("/api/admin/media", requireAuth, upload.array("files", 20), async (req, res) => {
     const files = (req.files as Express.Multer.File[]) ?? [];
     if (!files.length) return res.status(400).json({ message: "Keine Bilder hochgeladen (JPG, PNG, GIF, WebP, max. 15 MB)" });
-    // Große Bilder automatisch verkleinern (max. 1600px Breite)
+    // Validieren (muss ein echtes Bild sein) und große Bilder verkleinern (max. 1600px Breite)
+    const validFiles: Express.Multer.File[] = [];
     for (const f of files) {
       try {
         const meta = await sharp(f.path).metadata();
-        if ((meta.width ?? 0) > 1600) {
+        if (!meta.width || !meta.height) throw new Error("kein Bild");
+        if (meta.width > 1600) {
           const tmp = `${f.path}.tmp`;
           await sharp(f.path).rotate().resize({ width: 1600 }).toFile(tmp);
           fs.renameSync(tmp, f.path);
         }
-      } catch { /* Nicht-Bilder/Fehler ignorieren */ }
+        validFiles.push(f);
+      } catch {
+        // Ungültige Datei löschen statt behalten
+        try { fs.unlinkSync(f.path); } catch { /* ignore */ }
+      }
     }
-    const created = files.map((f) =>
+    if (!validFiles.length) {
+      return res.status(400).json({ message: "Die Datei(en) konnten nicht als Bild verarbeitet werden." });
+    }
+    const created = validFiles.map((f) =>
       storage.createMedia({
         filename: f.filename,
         url: `/uploads/neu/${f.filename}`,
