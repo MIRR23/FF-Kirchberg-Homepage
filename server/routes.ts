@@ -1,0 +1,401 @@
+import type { Express, Request } from "express";
+import express from "express";
+import type { Server } from "node:http";
+import path from "node:path";
+import fs from "node:fs";
+import multer from "multer";
+import sharp from "sharp";
+import { storage } from "./storage";
+import {
+  insertPostSchema, insertEventSchema, insertVehicleSchema,
+  insertMemberSchema, insertPageSchema, insertUserSchema,
+  PERMISSION_AREAS,
+} from "@shared/schema";
+import type { PermissionArea } from "@shared/schema";
+import {
+  hashPassword, verifyPassword, newToken, safeUser,
+  requireAuth, requirePermission, requireAdmin, hasPermission,
+} from "./auth";
+
+const UPLOAD_DIR = path.resolve(process.cwd(), "uploads");
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => {
+      const dir = path.join(UPLOAD_DIR, "neu");
+      fs.mkdirSync(dir, { recursive: true });
+      cb(null, dir);
+    },
+    filename: (_req, file, cb) => {
+      const safe = file.originalname.normalize("NFKD").replace(/[^a-zA-Z0-9._-]/g, "_");
+      cb(null, `${Date.now()}_${safe}`);
+    },
+  }),
+  limits: { fileSize: 15 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    cb(null, /image\/(jpeg|png|gif|webp|avif)/.test(file.mimetype));
+  },
+});
+
+function postArea(categoryId: number): PermissionArea {
+  const cat = storage.getCategory(categoryId);
+  return cat?.isEinsatz ? "einsaetze" : "neuigkeiten";
+}
+
+function slugify(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80) || "beitrag";
+}
+
+function uniquePostSlug(base: string, excludeId?: number): string {
+  let slug = base;
+  let i = 2;
+  for (;;) {
+    const existing = storage.getPostBySlug(slug);
+    if (!existing || existing.id === excludeId) return slug;
+    slug = `${base}-${i++}`;
+  }
+}
+
+export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
+  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+  app.use("/uploads", express.static(UPLOAD_DIR, { maxAge: "7d" }));
+
+  // ---------- AUTH ----------
+  app.post("/api/auth/login", (req, res) => {
+    const { username, password } = req.body ?? {};
+    if (!username || !password) return res.status(400).json({ message: "Benutzername und Passwort erforderlich" });
+    const user = storage.getUserByUsername(String(username).toLowerCase().trim());
+    if (!user || !user.active || !verifyPassword(String(password), user.password)) {
+      return res.status(401).json({ message: "Benutzername oder Passwort falsch" });
+    }
+    const token = newToken();
+    storage.createToken(token, user.id);
+    res.json({ token, user: safeUser(user as any) });
+  });
+
+  app.post("/api/auth/logout", requireAuth, (req, res) => {
+    const header = req.headers.authorization || "";
+    storage.deleteToken(header.slice(7));
+    res.json({ ok: true });
+  });
+
+  app.get("/api/auth/me", requireAuth, (req, res) => {
+    res.json(req.currentUser);
+  });
+
+  app.post("/api/auth/change-password", requireAuth, (req, res) => {
+    const { oldPassword, newPassword } = req.body ?? {};
+    if (!newPassword || String(newPassword).length < 8) {
+      return res.status(400).json({ message: "Neues Passwort muss mindestens 8 Zeichen haben" });
+    }
+    const user = storage.getUser(req.currentUser!.id);
+    if (!user || !verifyPassword(String(oldPassword ?? ""), user.password)) {
+      return res.status(401).json({ message: "Aktuelles Passwort falsch" });
+    }
+    storage.updateUser(user.id, { password: hashPassword(String(newPassword)) });
+    res.json({ ok: true });
+  });
+
+  // ---------- PUBLIC ----------
+  app.get("/api/categories", (_req, res) => {
+    res.json(storage.listCategories());
+  });
+
+  app.get("/api/posts", (req, res) => {
+    const { category, year, einsatz, limit } = req.query;
+    let categoryId: number | undefined;
+    if (category) {
+      const cat = storage.getCategoryBySlug(String(category));
+      if (!cat) return res.json([]);
+      categoryId = cat.id;
+    }
+    let list = storage.listPosts({
+      categoryId,
+      status: "published",
+      year: year ? String(year) : undefined,
+    });
+    if (einsatz === "1") {
+      const einsatzIds = new Set(storage.listCategories().filter((c) => c.isEinsatz).map((c) => c.id));
+      list = list.filter((p) => einsatzIds.has(p.categoryId));
+    }
+    if (limit) list = list.slice(0, Number(limit));
+    // Inhalte in Listen nicht mitschicken (Performance)
+    res.json(list.map(({ content, ...rest }) => ({ ...rest, content: "" })));
+  });
+
+  app.get("/api/posts/years", (_req, res) => {
+    const list = storage.listPosts({ status: "published" });
+    const years = Array.from(new Set(list.map((p) => p.publishedAt.slice(0, 4)))).sort().reverse();
+    res.json(years);
+  });
+
+  app.get("/api/posts/slug/:slug", (req, res) => {
+    const post = storage.getPostBySlug(req.params.slug);
+    if (!post || post.status !== "published") return res.status(404).json({ message: "Beitrag nicht gefunden" });
+    res.json(post);
+  });
+
+  app.get("/api/events", (_req, res) => {
+    res.json(storage.listEvents());
+  });
+
+  app.get("/api/vehicles", (_req, res) => {
+    res.json(storage.listVehicles());
+  });
+
+  app.get("/api/members", (_req, res) => {
+    res.json(storage.listMembers());
+  });
+
+  app.get("/api/pages/:slug", (req, res) => {
+    const page = storage.getPageBySlug(req.params.slug);
+    if (!page) return res.status(404).json({ message: "Seite nicht gefunden" });
+    res.json(page);
+  });
+
+  app.get("/api/stats", (_req, res) => {
+    const allPosts = storage.listPosts({ status: "published" });
+    const einsatzIds = new Set(storage.listCategories().filter((c) => c.isEinsatz).map((c) => c.id));
+    const einsaetze = allPosts.filter((p) => einsatzIds.has(p.categoryId));
+    const thisYear = new Date().getFullYear().toString();
+    res.json({
+      einsaetzeGesamt: einsaetze.length,
+      einsaetzeJahr: einsaetze.filter((p) => p.publishedAt.startsWith(thisYear)).length,
+      fahrzeuge: storage.listVehicles().length,
+      aktive: storage.listMembers().filter((m) => m.gruppe === "aktive").length,
+    });
+  });
+
+  // ---------- ADMIN: Beiträge ----------
+  app.get("/api/admin/posts", requireAuth, (req, res) => {
+    const all = storage.listPosts({});
+    const visible = all.filter((p) =>
+      hasPermission(req.currentUser!, postArea(p.categoryId))
+    );
+    res.json(visible.map(({ content, ...rest }) => ({ ...rest, content: "" })));
+  });
+
+  app.get("/api/admin/posts/:id", requireAuth, (req, res) => {
+    const post = storage.getPost(Number(req.params.id));
+    if (!post) return res.status(404).json({ message: "Nicht gefunden" });
+    if (!hasPermission(req.currentUser!, postArea(post.categoryId))) {
+      return res.status(403).json({ message: "Keine Berechtigung" });
+    }
+    res.json(post);
+  });
+
+  app.post("/api/admin/posts", requireAuth, (req, res) => {
+    const parsed = insertPostSchema.omit({ slug: true }).safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: parsed.error.errors[0]?.message ?? "Ungültige Daten" });
+    if (!hasPermission(req.currentUser!, postArea(parsed.data.categoryId))) {
+      return res.status(403).json({ message: "Keine Berechtigung für diese Kategorie" });
+    }
+    const slug = uniquePostSlug(slugify(parsed.data.title));
+    const post = storage.createPost({
+      ...parsed.data,
+      slug,
+      authorName: parsed.data.authorName || req.currentUser!.displayName,
+    });
+    res.json(post);
+  });
+
+  app.patch("/api/admin/posts/:id", requireAuth, (req, res) => {
+    const id = Number(req.params.id);
+    const existing = storage.getPost(id);
+    if (!existing) return res.status(404).json({ message: "Nicht gefunden" });
+    if (!hasPermission(req.currentUser!, postArea(existing.categoryId))) {
+      return res.status(403).json({ message: "Keine Berechtigung" });
+    }
+    const parsed = insertPostSchema.partial().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Ungültige Daten" });
+    if (parsed.data.categoryId && !hasPermission(req.currentUser!, postArea(parsed.data.categoryId))) {
+      return res.status(403).json({ message: "Keine Berechtigung für die Ziel-Kategorie" });
+    }
+    const post = storage.updatePost(id, parsed.data);
+    res.json(post);
+  });
+
+  app.delete("/api/admin/posts/:id", requireAuth, (req, res) => {
+    const existing = storage.getPost(Number(req.params.id));
+    if (!existing) return res.status(404).json({ message: "Nicht gefunden" });
+    if (!hasPermission(req.currentUser!, postArea(existing.categoryId))) {
+      return res.status(403).json({ message: "Keine Berechtigung" });
+    }
+    storage.deletePost(existing.id);
+    res.json({ ok: true });
+  });
+
+  // ---------- ADMIN: Termine ----------
+  app.post("/api/admin/events", requireAuth, requirePermission("termine"), (req, res) => {
+    const parsed = insertEventSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Ungültige Daten" });
+    res.json(storage.createEvent(parsed.data));
+  });
+  app.patch("/api/admin/events/:id", requireAuth, requirePermission("termine"), (req, res) => {
+    const parsed = insertEventSchema.partial().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Ungültige Daten" });
+    res.json(storage.updateEvent(Number(req.params.id), parsed.data));
+  });
+  app.delete("/api/admin/events/:id", requireAuth, requirePermission("termine"), (req, res) => {
+    storage.deleteEvent(Number(req.params.id));
+    res.json({ ok: true });
+  });
+
+  // ---------- ADMIN: Fahrzeuge ----------
+  app.post("/api/admin/vehicles", requireAuth, requirePermission("fahrzeuge"), (req, res) => {
+    const parsed = insertVehicleSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Ungültige Daten" });
+    res.json(storage.createVehicle(parsed.data));
+  });
+  app.patch("/api/admin/vehicles/:id", requireAuth, requirePermission("fahrzeuge"), (req, res) => {
+    const parsed = insertVehicleSchema.partial().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Ungültige Daten" });
+    res.json(storage.updateVehicle(Number(req.params.id), parsed.data));
+  });
+  app.delete("/api/admin/vehicles/:id", requireAuth, requirePermission("fahrzeuge"), (req, res) => {
+    storage.deleteVehicle(Number(req.params.id));
+    res.json({ ok: true });
+  });
+
+  // ---------- ADMIN: Mitglieder ----------
+  app.post("/api/admin/members", requireAuth, requirePermission("mitglieder"), (req, res) => {
+    const parsed = insertMemberSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Ungültige Daten" });
+    res.json(storage.createMember(parsed.data));
+  });
+  app.patch("/api/admin/members/:id", requireAuth, requirePermission("mitglieder"), (req, res) => {
+    const parsed = insertMemberSchema.partial().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Ungültige Daten" });
+    res.json(storage.updateMember(Number(req.params.id), parsed.data));
+  });
+  app.delete("/api/admin/members/:id", requireAuth, requirePermission("mitglieder"), (req, res) => {
+    storage.deleteMember(Number(req.params.id));
+    res.json({ ok: true });
+  });
+
+  // ---------- ADMIN: Seiten ----------
+  app.get("/api/admin/pages", requireAuth, requirePermission("seiten"), (_req, res) => {
+    res.json(storage.listPages());
+  });
+  app.patch("/api/admin/pages/:id", requireAuth, requirePermission("seiten"), (req, res) => {
+    const parsed = insertPageSchema.partial().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Ungültige Daten" });
+    res.json(storage.updatePage(Number(req.params.id), { ...parsed.data, updatedAt: new Date().toISOString() }));
+  });
+
+  // ---------- ADMIN: Medien ----------
+  app.get("/api/admin/media", requireAuth, (_req, res) => {
+    res.json(storage.listMedia());
+  });
+
+  app.post("/api/admin/media", requireAuth, upload.array("files", 20), async (req, res) => {
+    const files = (req.files as Express.Multer.File[]) ?? [];
+    if (!files.length) return res.status(400).json({ message: "Keine Bilder hochgeladen (JPG, PNG, GIF, WebP, max. 15 MB)" });
+    // Große Bilder automatisch verkleinern (max. 1600px Breite)
+    for (const f of files) {
+      try {
+        const meta = await sharp(f.path).metadata();
+        if ((meta.width ?? 0) > 1600) {
+          const tmp = `${f.path}.tmp`;
+          await sharp(f.path).rotate().resize({ width: 1600 }).toFile(tmp);
+          fs.renameSync(tmp, f.path);
+        }
+      } catch { /* Nicht-Bilder/Fehler ignorieren */ }
+    }
+    const created = files.map((f) =>
+      storage.createMedia({
+        filename: f.filename,
+        url: `/uploads/neu/${f.filename}`,
+        title: f.originalname,
+        uploadedAt: new Date().toISOString(),
+        uploadedBy: req.currentUser!.displayName,
+      })
+    );
+    res.json(created);
+  });
+
+  app.delete("/api/admin/media/:id", requireAuth, requirePermission("medien"), (req, res) => {
+    const item = storage.getMedia(Number(req.params.id));
+    if (item) {
+      const fp = path.join(process.cwd(), item.url.replace(/^\//, ""));
+      if (fp.startsWith(UPLOAD_DIR) && fs.existsSync(fp)) fs.unlinkSync(fp);
+      storage.deleteMedia(item.id);
+    }
+    res.json({ ok: true });
+  });
+
+  // ---------- ADMIN: Benutzerverwaltung (nur Admin) ----------
+  app.get("/api/admin/users", requireAuth, requireAdmin, (_req, res) => {
+    res.json(storage.listUsers().map((u) => safeUser(u as any)));
+  });
+
+  app.post("/api/admin/users", requireAuth, requireAdmin, (req, res) => {
+    const body = req.body ?? {};
+    if (!body.username || !body.password || !body.displayName) {
+      return res.status(400).json({ message: "Benutzername, Passwort und Anzeigename erforderlich" });
+    }
+    if (String(body.password).length < 8) {
+      return res.status(400).json({ message: "Passwort muss mindestens 8 Zeichen haben" });
+    }
+    if (storage.getUserByUsername(String(body.username).toLowerCase().trim())) {
+      return res.status(400).json({ message: "Benutzername bereits vergeben" });
+    }
+    const perms = Array.isArray(body.permissions)
+      ? body.permissions.filter((p: string) => (PERMISSION_AREAS as readonly string[]).includes(p))
+      : [];
+    const user = storage.createUser({
+      username: String(body.username).toLowerCase().trim(),
+      password: hashPassword(String(body.password)),
+      displayName: String(body.displayName),
+      role: body.role === "admin" ? "admin" : "editor",
+      permissions: JSON.stringify(perms),
+      active: 1,
+    });
+    res.json(safeUser(user as any));
+  });
+
+  app.patch("/api/admin/users/:id", requireAuth, requireAdmin, (req, res) => {
+    const id = Number(req.params.id);
+    const existing = storage.getUser(id);
+    if (!existing) return res.status(404).json({ message: "Nicht gefunden" });
+    const body = req.body ?? {};
+    const update: Record<string, unknown> = {};
+    if (body.displayName) update.displayName = String(body.displayName);
+    if (body.role) update.role = body.role === "admin" ? "admin" : "editor";
+    if (typeof body.active === "number") update.active = body.active ? 1 : 0;
+    if (Array.isArray(body.permissions)) {
+      update.permissions = JSON.stringify(
+        body.permissions.filter((p: string) => (PERMISSION_AREAS as readonly string[]).includes(p))
+      );
+    }
+    if (body.password) {
+      if (String(body.password).length < 8) return res.status(400).json({ message: "Passwort muss mindestens 8 Zeichen haben" });
+      update.password = hashPassword(String(body.password));
+    }
+    // Sicherheitsnetz: letzten aktiven Admin nicht degradieren/deaktivieren
+    if (existing.role === "admin" && (update.role === "editor" || update.active === 0)) {
+      const admins = storage.listUsers().filter((u) => u.role === "admin" && u.active && u.id !== id);
+      if (!admins.length) return res.status(400).json({ message: "Der letzte Administrator kann nicht deaktiviert werden" });
+    }
+    res.json(safeUser(storage.updateUser(id, update as any) as any));
+  });
+
+  app.delete("/api/admin/users/:id", requireAuth, requireAdmin, (req, res) => {
+    const id = Number(req.params.id);
+    const existing = storage.getUser(id);
+    if (!existing) return res.status(404).json({ message: "Nicht gefunden" });
+    if (existing.role === "admin") {
+      const admins = storage.listUsers().filter((u) => u.role === "admin" && u.active && u.id !== id);
+      if (!admins.length) return res.status(400).json({ message: "Der letzte Administrator kann nicht gelöscht werden" });
+    }
+    storage.deleteUser(id);
+    res.json({ ok: true });
+  });
+
+  return httpServer;
+}
