@@ -13,7 +13,10 @@ import { storage, db } from "./storage";
 import { users, categories, posts, events, vehicles, members, pages, media } from "@shared/schema";
 import { hashPassword } from "./auth";
 
-const SRC = path.resolve(process.cwd(), "../ffk_site");
+// Quelle: kompletter Backup-Ordner (../ffk_site) oder die im Repo enthaltenen JSON-Exporte
+const SRC = fs.existsSync(path.resolve(process.cwd(), "../ffk_site/json"))
+  ? path.resolve(process.cwd(), "../ffk_site")
+  : path.resolve(process.cwd(), "migration-data");
 const UPLOADS = path.resolve(process.cwd(), "uploads/wp");
 
 function readJson(name: string): any[] {
@@ -49,14 +52,17 @@ for (const m of wpMedia) {
   const src = m.source_url as string;
   if (!src) continue;
   const basename = path.basename(src.split("?")[0]);
-  const localFile = path.join(SRC, "media", `${m.id}_${basename}`);
-  if (!fs.existsSync(localFile) || fs.statSync(localFile).size === 0) {
-    missing++;
-    continue;
-  }
   const destName = `${m.id}_${basename}`;
   const dest = path.join(UPLOADS, destName);
-  if (!fs.existsSync(dest)) fs.copyFileSync(localFile, dest);
+  // Bereits in uploads/wp vorhandene Dateien (z. B. aus dem Repo) direkt verwenden
+  if (!fs.existsSync(dest)) {
+    const localFile = path.join(SRC, "media", `${m.id}_${basename}`);
+    if (!fs.existsSync(localFile) || fs.statSync(localFile).size === 0) {
+      missing++;
+      continue;
+    }
+    fs.copyFileSync(localFile, dest);
+  }
   const url = `/uploads/wp/${destName}`;
   mediaById.set(m.id, url);
 
@@ -146,6 +152,45 @@ async function makeThumb(localUrl: string | null): Promise<string | null> {
   }
 }
 
+/** Lädt in Inhalten verlinkte Upload-Dateien nach, die nicht in der Mediathek waren. */
+async function fetchMissingUploads(allHtml: string[]): Promise<void> {
+  const found = new Set<string>();
+  for (const html of allHtml) {
+    for (const m of (html || "").matchAll(/wp-content\/uploads\/([^"'\s\\)<>]+)/g)) {
+      found.add(m[1].split("?")[0]);
+    }
+  }
+  let added = 0;
+  for (const relRaw of found) {
+    let rel = relRaw;
+    try { rel = decodeURIComponent(relRaw); } catch { /* ignore */ }
+    if (resolveUploadUrl(`/wp-content/uploads/${rel}`)) continue;
+    if (!/\.(jpe?g|png|gif|webp|pdf)$/i.test(rel)) continue;
+    const dir = path.dirname(rel);
+    const base = path.basename(rel);
+    const ext = path.extname(base);
+    const stem = base.slice(0, -ext.length).replace(/-\d+x\d+$/, "");
+    const candidates = Array.from(new Set([base, `${stem}${ext}`, `${stem}-scaled${ext}`]));
+    for (const cand of candidates) {
+      const remote = encodeURI(`https://www.ff-kirchberg.de/wp-content/uploads/${dir}/${cand}`);
+      try {
+        const res = await fetch(remote, { headers: { "User-Agent": "Mozilla/5.0" } });
+        if (!res.ok) continue;
+        const buf = Buffer.from(await res.arrayBuffer());
+        if (!buf.length) continue;
+        const destName = `x_${dir.replace(/\//g, "-")}_${cand}`;
+        fs.writeFileSync(path.join(UPLOADS, destName), buf);
+        const url = `/uploads/wp/${destName}`;
+        mediaByKey.set(`${dir}/${cand}`.toLowerCase(), url);
+        if (cand !== base) mediaByKey.set(`${dir}/${stem}${ext}`.toLowerCase(), url);
+        added++;
+        break;
+      } catch { /* weiter */ }
+    }
+  }
+  console.log(`Nachgeladene Dateien: ${added}`);
+}
+
 async function main() {
   // ---------- Tabellen leeren ----------
   db.delete(posts).run();
@@ -205,6 +250,11 @@ async function main() {
 
   // ---------- Beiträge ----------
   const wpPosts = readJson("posts");
+  const wpPagesAll = readJson("pages");
+  await fetchMissingUploads([
+    ...wpPosts.map((p: any) => p.content?.rendered ?? ""),
+    ...wpPagesAll.map((p: any) => p.content?.rendered ?? ""),
+  ]);
   const fallbackCat = storage.getCategoryBySlug("allgemein")!.id;
   let postCount = 0;
   for (const p of wpPosts) {
