@@ -3,6 +3,7 @@ import express, { Response, NextFunction } from 'express';
 import type { Request } from 'express';
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
+import { storage } from "./storage";
 import { createServer } from "node:http";
 
 const app = express();
@@ -62,6 +63,21 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Auto-Migration: Ist die Datenbank leer (z. B. frischer Vorschau-Server ohne
+  // dauerhaften Speicher), werden Inhalte automatisch aus migration-data/ erzeugt.
+  // Standardmäßig aktiv; mit AUTO_MIGRATE=0 abschaltbar. Bestehende Daten bleiben
+  // unangetastet, da nur bei komplett leerer Datenbank migriert wird.
+  if (process.env.AUTO_MIGRATE !== "0" && storage.countUsers() === 0) {
+    try {
+      log("Datenbank leer – starte automatische Migration …", "migrate");
+      const { runMigration } = await import("./migrate");
+      await runMigration();
+      log("Automatische Migration abgeschlossen.", "migrate");
+    } catch (err) {
+      console.error("Automatische Migration fehlgeschlagen:", err);
+    }
+  }
+
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {

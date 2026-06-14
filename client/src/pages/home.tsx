@@ -34,6 +34,7 @@ export default function Home() {
           <img
             src={withBase(heroPost.featuredImage)}
             alt=""
+            aria-hidden="true"
             className="absolute inset-0 h-full w-full object-cover"
           />
         )}

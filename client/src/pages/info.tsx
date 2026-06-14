@@ -1,7 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { CalendarDays, Clock, MapPin, UserRound } from "lucide-react";
 import type { Vehicle, Member, Page, Event } from "@shared/schema";
-import { withBase, rewriteContent } from "@/lib/auth";
+import { withBase } from "@/lib/auth";
+import { cleanHtml } from "@/lib/sanitize";
+import { usePageTitle } from "@/lib/seo";
 import { formatDate, dayOfMonth, monthShort } from "@/lib/format";
 import { PublicLayout, EmptyState } from "@/components/site";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,6 +20,7 @@ function PageTitle({ kicker, title, intro }: { kicker: string; title: string; in
 
 // ---------- Gerätehaus / Fahrzeuge ----------
 export function Geraetehaus() {
+  usePageTitle("Gerätehaus & Fahrzeuge");
   const { data: vehicles, isLoading } = useQuery<Vehicle[]>({ queryKey: ["/api/vehicles"] });
 
   return (
@@ -54,7 +57,7 @@ export function Geraetehaus() {
                   <h2 className="mt-1 font-display text-2xl font-semibold">{v.name}</h2>
                   <div
                     className="prose-content mt-4 text-sm text-foreground/90"
-                    dangerouslySetInnerHTML={{ __html: rewriteContent(v.description) }}
+                    dangerouslySetInnerHTML={{ __html: cleanHtml(v.description) }}
                   />
                 </div>
               </div>
@@ -68,6 +71,7 @@ export function Geraetehaus() {
 
 // ---------- Über uns ----------
 export function UeberUns() {
+  usePageTitle("Über uns");
   const { data: page } = useQuery<Page>({ queryKey: ["/api/pages/ueber-uns"] });
   const { data: members, isLoading } = useQuery<Member[]>({ queryKey: ["/api/members"] });
 
@@ -79,7 +83,7 @@ export function UeberUns() {
       <div className="mx-auto max-w-6xl px-4 py-12 md:px-8 md:py-16">
         <PageTitle kicker="Über uns" title={page?.title || "Die Feuerwehr Kirchberg"} />
         {page ? (
-          <div className="prose-content max-w-3xl" dangerouslySetInnerHTML={{ __html: rewriteContent(page.content) }} />
+          <div className="prose-content max-w-3xl" dangerouslySetInnerHTML={{ __html: cleanHtml(page.content) }} />
         ) : (
           <Skeleton className="h-40 max-w-3xl" />
         )}
@@ -128,6 +132,7 @@ function MemberGrid({ members }: { members: Member[] }) {
 
 // ---------- Termine ----------
 export function Termine() {
+  usePageTitle("Termine & Veranstaltungen");
   const { data: events, isLoading } = useQuery<Event[]>({ queryKey: ["/api/events"] });
   const today = new Date().toISOString().slice(0, 10);
   const upcoming = (events ?? []).filter((e) => e.date >= today);
@@ -190,6 +195,7 @@ function EventRow({ event: e }: { event: Event }) {
 // ---------- Statische Seiten ----------
 export function StaticPage({ slug, kicker }: { slug: string; kicker: string }) {
   const { data: page, isLoading, error } = useQuery<Page>({ queryKey: [`/api/pages/${slug}`] });
+  usePageTitle(page?.title ?? kicker);
   return (
     <PublicLayout>
       <div className="mx-auto max-w-3xl px-4 py-12 md:px-8 md:py-16">
@@ -206,7 +212,7 @@ export function StaticPage({ slug, kicker }: { slug: string; kicker: string }) {
             <div
               className="prose-content"
               data-testid={`text-page-${slug}`}
-              dangerouslySetInnerHTML={{ __html: rewriteContent(page.content) }}
+              dangerouslySetInnerHTML={{ __html: cleanHtml(page.content) }}
             />
           </>
         )}

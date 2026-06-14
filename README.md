@@ -71,6 +71,18 @@ NODE_ENV=production PORT=5000 node dist/index.cjs
 ```
 
 `uploads/` und `data.db` liegen im Projektverzeichnis und müssen mitgesichert werden.
+Ist die Datenbank beim Start leer, wird sie automatisch aus `migration-data/` befüllt
+(`AUTO_MIGRATE`, mit `AUTO_MIGRATE=0` abschaltbar).
+
+## Vorschau für den Kunden veröffentlichen
+
+Die Seite lässt sich als kostenlose Vorschau ins Netz stellen, ohne die alte Domain
+umzustellen – per **Render.com** (Blueprint `render.yaml`) oder **Docker**
+(`docker compose up -d --build`). Schritt-für-Schritt-Anleitung:
+**[BETRIEB.md → Vorschau veröffentlichen](BETRIEB.md)**.
+
+Eine Bewertung des Projekts (Stärken, Verbesserungen, umgesetzte Änderungen) steht in
+**[BEWERTUNG.md](BEWERTUNG.md)**.
 
 ## Datenbank neu aufbauen (Migration)
 

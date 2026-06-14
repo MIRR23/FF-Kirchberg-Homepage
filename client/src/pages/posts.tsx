@@ -3,7 +3,8 @@ import { Link, useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, MapPin, User } from "lucide-react";
 import type { Post } from "@shared/schema";
-import { rewriteContent } from "@/lib/auth";
+import { cleanHtml } from "@/lib/sanitize";
+import { usePageTitle } from "@/lib/seo";
 import { formatDateLong, formatTime, yearOf } from "@/lib/format";
 import { PublicLayout, PostCard, EmptyState, CategoryBadge, useCategories, categoryById } from "@/components/site";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -63,6 +64,7 @@ function PostGrid({ posts, loading }: { posts: Post[] | undefined; loading: bool
 const PAGE_SIZE = 12;
 
 export function Aktuelles() {
+  usePageTitle("Aktuelles");
   const [cat, setCat] = useState("");
   const [shown, setShown] = useState(PAGE_SIZE);
   const { data: categories } = useCategories();
@@ -101,6 +103,7 @@ export function Aktuelles() {
 }
 
 export function Einsaetze() {
+  usePageTitle("Einsatzberichte");
   const [year, setYear] = useState("");
   const { data: years } = useQuery<string[]>({ queryKey: ["/api/posts/years"] });
   const key = `/api/posts?einsatz=1${year ? `&year=${year}` : ""}`;
@@ -138,6 +141,7 @@ export function Einsaetze() {
 }
 
 export function Archiv() {
+  usePageTitle("Beitragsarchiv");
   const { data: years } = useQuery<string[]>({ queryKey: ["/api/posts/years"] });
   const { data: allPosts } = useQuery<Post[]>({ queryKey: ["/api/posts"] });
   const [year, setYear] = useState<string>("");
@@ -194,12 +198,13 @@ export function PostDetail() {
   const slug = params?.slug ?? "";
   const { data: post, isLoading, error } = useQuery<Post>({ queryKey: [`/api/posts/slug/${slug}`] });
   const { data: categories } = useCategories();
+  usePageTitle(post?.title);
 
   return (
     <PublicLayout>
       <article className="mx-auto max-w-3xl px-4 py-12 md:px-8 md:py-16">
         <Link href="/aktuelles" className="mb-8 inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="h-4 w-4" /> Zurück zur Übersicht
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" /> Zurück zur Übersicht
         </Link>
         {isLoading ? (
           <div className="space-y-4">
@@ -225,7 +230,7 @@ export function PostDetail() {
             <div
               className="prose-content mt-8"
               data-testid="text-post-content"
-              dangerouslySetInnerHTML={{ __html: rewriteContent(post.content) }}
+              dangerouslySetInnerHTML={{ __html: cleanHtml(post.content) }}
             />
           </>
         )}
