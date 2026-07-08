@@ -1,6 +1,8 @@
 import "dotenv/config";
 import express, { Response, NextFunction } from 'express';
 import type { Request } from 'express';
+import compression from "compression";
+import { MulterError } from "multer";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { storage } from "./storage";
@@ -15,8 +17,14 @@ declare module "http" {
   }
 }
 
+// Antworten komprimieren (HTML/JS/CSS/JSON) – deutlich schnellere Ladezeiten,
+// falls kein Reverse-Proxy davor bereits komprimiert.
+app.use(compression());
+
 app.use(
   express.json({
+    // Standard wären 100 kB – lange Seiten (z. B. Chronik) brauchen mehr Spielraum
+    limit: "2mb",
     verify: (req, _res, buf) => {
       req.rawBody = buf;
     },
@@ -81,14 +89,28 @@ app.use((req, res, next) => {
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
+    if (res.headersSent) {
+      return next(err);
+    }
+
+    // Upload-Fehler verständlich auf Deutsch melden statt als Serverfehler
+    if (err instanceof MulterError) {
+      const message =
+        err.code === "LIMIT_FILE_SIZE"
+          ? "Eine Datei ist zu groß (max. 15 MB pro Bild)."
+          : err.code === "LIMIT_FILE_COUNT" || err.code === "LIMIT_UNEXPECTED_FILE"
+            ? "Zu viele Dateien auf einmal (max. 20 Bilder pro Upload)."
+            : "Der Upload konnte nicht verarbeitet werden.";
+      return res.status(400).json({ message });
+    }
+    if (err?.type === "entity.too.large") {
+      return res.status(413).json({ message: "Der Inhalt ist zu groß zum Speichern." });
+    }
+
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
 
     console.error("Internal Server Error:", err);
-
-    if (res.headersSent) {
-      return next(err);
-    }
 
     return res.status(status).json({ message });
   });

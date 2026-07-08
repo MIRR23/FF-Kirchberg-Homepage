@@ -20,6 +20,13 @@ export function newToken(): string {
   return crypto.randomBytes(32).toString("hex");
 }
 
+/** Gültigkeitsdauer einer Anmeldung. Danach ist ein erneutes Anmelden nötig. */
+export const TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 Tage
+
+export function tokenCutoffIso(): string {
+  return new Date(Date.now() - TOKEN_TTL_MS).toISOString();
+}
+
 export function safeUser(u: { password: string } & SafeUser & { password: string }): SafeUser {
   const { password, ...rest } = u as any;
   return rest;
@@ -40,6 +47,10 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
   if (!token) return res.status(401).json({ message: "Nicht angemeldet" });
   const t = storage.getToken(token);
   if (!t) return res.status(401).json({ message: "Sitzung abgelaufen" });
+  if (t.createdAt < tokenCutoffIso()) {
+    storage.deleteToken(token);
+    return res.status(401).json({ message: "Sitzung abgelaufen – bitte erneut anmelden" });
+  }
   const user = storage.getUser(t.userId);
   if (!user || !user.active) return res.status(401).json({ message: "Benutzer inaktiv" });
   req.currentUser = safeUser(user as any);

@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Switch, Route, Router } from "wouter";
 import { useHashLocation } from "wouter/use-hash-location";
 import { queryClient } from "./lib/queryClient";
@@ -9,13 +10,30 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import { Aktuelles, Einsaetze, Archiv, PostDetail } from "@/pages/posts";
 import { Geraetehaus, UeberUns, Termine, StaticPage } from "@/pages/info";
-import { AdminLogin, AdminDashboard, AdminKonto } from "@/pages/admin/core";
-import { AdminPosts, AdminPostEditor } from "@/pages/admin/posts";
-import { AdminEvents, AdminVehicles, AdminMembers } from "@/pages/admin/content";
-import { AdminPages, AdminMedia, AdminUsers } from "@/pages/admin/manage";
+
+// Interner Bereich wird erst geladen, wenn er aufgerufen wird (kleineres
+// Startpaket für normale Besucher). Alle Admin-Module landen im selben Chunk.
+const AdminLogin = lazy(() => import("@/pages/admin/core").then((m) => ({ default: m.AdminLogin })));
+const AdminDashboard = lazy(() => import("@/pages/admin/core").then((m) => ({ default: m.AdminDashboard })));
+const AdminKonto = lazy(() => import("@/pages/admin/core").then((m) => ({ default: m.AdminKonto })));
+const AdminPosts = lazy(() => import("@/pages/admin/posts").then((m) => ({ default: m.AdminPosts })));
+const AdminPostEditor = lazy(() => import("@/pages/admin/posts").then((m) => ({ default: m.AdminPostEditor })));
+const AdminEvents = lazy(() => import("@/pages/admin/content").then((m) => ({ default: m.AdminEvents })));
+const AdminVehicles = lazy(() => import("@/pages/admin/content").then((m) => ({ default: m.AdminVehicles })));
+const AdminMembers = lazy(() => import("@/pages/admin/content").then((m) => ({ default: m.AdminMembers })));
+const AdminPages = lazy(() => import("@/pages/admin/manage").then((m) => ({ default: m.AdminPages })));
+const AdminMedia = lazy(() => import("@/pages/admin/manage").then((m) => ({ default: m.AdminMedia })));
+const AdminUsers = lazy(() => import("@/pages/admin/manage").then((m) => ({ default: m.AdminUsers })));
 
 function AppRouter() {
   return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">
+          Wird geladen …
+        </div>
+      }
+    >
     <Switch>
       {/* Öffentliche Website */}
       <Route path="/" component={Home} />
@@ -47,6 +65,7 @@ function AppRouter() {
 
       <Route component={NotFound} />
     </Switch>
+    </Suspense>
   );
 }
 

@@ -119,8 +119,9 @@ wenige Dateien begrenzt.
 
 ## Wichtige Hinweise
 
-- **Sitzungen:** Die Anmeldung gilt, solange der Browser-Tab geöffnet ist (Token im Speicher).
-  Auf dem eigenen Server kann auf Cookie-Sessions umgestellt werden.
+- **Sitzungen:** Die Anmeldung bleibt im Browser gespeichert und überlebt auch ein
+  Neuladen der Seite. Sie läuft nach 30 Tagen automatisch ab, danach ist eine erneute
+  Anmeldung nötig. „Abmelden" beendet die Sitzung sofort.
 - **Aktive/Vorstandschaft:** Nur Beispieldaten – echte Namen bitte im internen Bereich pflegen.
 - **Termine:** Beispieltermine eingetragen – bitte anpassen.
 - **Impressum/Datenschutz:** Inhalte wurden 1:1 von der alten Seite übernommen – bitte auf

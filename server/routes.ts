@@ -15,7 +15,7 @@ import {
 } from "@shared/schema";
 import type { PermissionArea } from "@shared/schema";
 import {
-  hashPassword, verifyPassword, newToken, safeUser,
+  hashPassword, verifyPassword, newToken, safeUser, tokenCutoffIso,
   requireAuth, requirePermission, requireAdmin, hasPermission,
 } from "./auth";
 
@@ -85,6 +85,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     if (!user || !user.active || !verifyPassword(String(password), user.password)) {
       return res.status(401).json({ message: "Benutzername oder Passwort falsch" });
     }
+    storage.deleteTokensCreatedBefore(tokenCutoffIso()); // abgelaufene Sitzungen aufräumen
     const token = newToken();
     storage.createToken(token, user.id);
     res.json({ token, user: safeUser(user as any) });
@@ -223,7 +224,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     if (!hasPermission(req.currentUser!, postArea(existing.categoryId))) {
       return res.status(403).json({ message: "Keine Berechtigung" });
     }
-    const parsed = insertPostSchema.partial().safeParse(req.body);
+    // Slug bleibt stabil (eindeutig, in Links verwendet) – wird beim Bearbeiten nie geändert
+    const parsed = insertPostSchema.omit({ slug: true }).partial().safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Ungültige Daten" });
     if (parsed.data.categoryId && !hasPermission(req.currentUser!, postArea(parsed.data.categoryId))) {
       return res.status(403).json({ message: "Keine Berechtigung für die Ziel-Kategorie" });
@@ -295,7 +297,8 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(storage.listPages());
   });
   app.patch("/api/admin/pages/:id", requireAuth, requirePermission("seiten"), (req, res) => {
-    const parsed = insertPageSchema.partial().safeParse(req.body);
+    // Slug bleibt stabil – die Website verlinkt Seiten fest über ihren Slug
+    const parsed = insertPageSchema.omit({ slug: true }).partial().safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Ungültige Daten" });
     res.json(storage.updatePage(Number(req.params.id), { ...parsed.data, updatedAt: new Date().toISOString() }));
   });

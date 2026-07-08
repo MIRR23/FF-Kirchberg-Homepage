@@ -57,6 +57,14 @@ CMS/internem Bereich mit Rollen- und Rechtesystem ist für einen Feuerwehrverein
 | Technik | `npm run check` (tsc) schlug fehl (fehlendes `target`) | `target: ESNext` in `tsconfig.json` – tsc läuft sauber |
 | Betrieb | Datenbank musste vor Betrieb manuell migriert werden | Auto-Migration beim Start, wenn die Datenbank leer ist (`AUTO_MIGRATE`) |
 | Veröffentlichung | Keine Deploy-Konfiguration | `render.yaml`, `Dockerfile`, `docker-compose.yml`, `.dockerignore` |
+| UX intern | Anmeldung ging bei jedem Neuladen (F5) verloren | Sitzung wird im Browser gespeichert und beim Laden wiederhergestellt |
+| Sicherheit | Anmelde-Tokens liefen serverseitig nie ab | 30-Tage-Ablauf + automatisches Aufräumen abgelaufener Sitzungen |
+| Robustheit | Bearbeiten konnte Slugs überschreiben (Serverfehler/kaputte Links) | Slug bei PATCH (Beiträge, Seiten) serverseitig fixiert |
+| Robustheit | Upload-/Größenfehler erschienen als kryptische englische 500er | Deutsche, verständliche Fehlermeldungen (Datei zu groß usw.) |
+| Robustheit | JSON-Limit 100 kB – zu knapp für lange Seiten (Chronik: 30 kB) | Limit auf 2 MB erhöht |
+| Inhalte | XSS-Filter hätte das YouTube-Video eines Einsatzberichts entfernt | YouTube/Vimeo-Einbettungen gezielt erlaubt (alles andere bleibt blockiert) |
+| Performance | Keine Kompression, keine Cache-Header, Admin im Besucher-Bundle | gzip-Kompression, Immutable-Caching für Assets, Code-Splitting (öffentliches JS: 485 → 334 kB) |
+| SEO | `og:image` relativ (wird von Portalen ignoriert), robots.txt fehlte | Absolute URL auf Zieldomain, robots.txt ergänzt |
 
 ### Weiterhin offen / Empfehlungen für später
 
@@ -64,13 +72,8 @@ CMS/internem Bereich mit Rollen- und Rechtesystem ist für einen Feuerwehrverein
   sind bewusst nur Platzhalter – vor Go-Live im internen Bereich pflegen.
 - **Impressum/Datenschutz prüfen.** 1:1 aus der alten Seite übernommen; auf Aktualität
   (Verantwortliche, Anschrift, DSGVO) prüfen lassen.
-- **Sitzungs-Persistenz.** Anmeldung gilt nur, solange der Tab offen ist (Token im
-  Speicher). Für Komfort ggf. auf `localStorage`/Cookie-Sessions umstellen; dann auch
-  Token-Ablauf serverseitig erzwingen.
 - **Archiv-Performance.** Die Archiv-Seite lädt alle Beiträge und filtert clientseitig.
   Bei stark wachsender Beitragszahl serverseitige Paginierung erwägen.
-- **Bundle-Größe.** Das JS-Bundle ist ~485 kB (gzip ~147 kB). Optional Code-Splitting
-  (z. B. Admin-Bereich per `lazy()`), um die öffentliche Seite schlanker zu laden.
 - **Strukturierte Daten.** Optional `schema.org`-Markup (Article/Event) für bessere
   Suchmaschinen-Darstellung.
 - **Bestätigungsdialoge.** Löschaktionen nutzen `window.confirm()`; ein gestylter Dialog
