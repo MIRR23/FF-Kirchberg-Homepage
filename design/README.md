@@ -2,16 +2,19 @@
 
 `design-entwuerfe.html` ist eine eigenständige Datei (einfach im Browser öffnen –
 keine Installation nötig) mit drei umschaltbaren Gestaltungsrichtungen für die
-Homepage, als Auswahl für den Kunden. Fotos, Beitragstitel, Termine und
-Seitenstruktur entsprechen den echten Inhalten.
+Homepage, als Auswahl für den Kunden – inklusive des bereits umgesetzten
+Designs als Entwurf D. Fotos, Beitragstitel, Termine und Seitenstruktur
+entsprechen den echten Inhalten.
 
 | Entwurf | Charakter | Kurzbeschreibung |
 | --- | --- | --- |
 | **A · Chronik** | klassisch, hell | Serifenschrift, Messing-Doppellinien, gerahmte Fotos – betont die Vereinsgeschichte seit 1874 |
 | **B · Weißraum** | modern, editorial | Magazin-Look: viel Luft, große Zahlen, Signalrot nur als Akzent |
 | **C · Signal** | plakativ, kräftig | Farbblöcke in Rot/Schwarz, Warnstreifen, Versal-Schlagzeilen – Einsatz-Charakter |
+| **D · Umgesetzt** | dunkel, fertig | Das bereits fertig entwickelte Design (dunkel, Rot/Amber) – bei Wahl sofort startklar |
 
-Das aktuelle Live-Design (dunkel, Rot/Amber) bleibt unverändert bestehen.
+Entwurf D entspricht dem aktuellen Stand der Anwendung – wird er gewählt,
+ist keine Design-Änderung nötig.
 
 ## Ansehen (auch am Handy)
 
@@ -37,4 +40,5 @@ daher im Wesentlichen ein **Re-Theming**:
    `client/src/pages/home.tsx` (z. B. zentriertes Masthead bei A, asymmetrischer
    Hero bei B, Warnstreifen/Farbblöcke bei C).
 
-Aufwand pro Entwurf grob: A/B ca. 1 Arbeitstag, C ca. 1–1,5 Arbeitstage.
+Aufwand pro Entwurf grob: A/B ca. 1 Arbeitstag, C ca. 1–1,5 Arbeitstage,
+D ist bereits fertig (kein Aufwand).
