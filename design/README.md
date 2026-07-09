@@ -13,6 +13,16 @@ Seitenstruktur entsprechen den echten Inhalten.
 
 Das aktuelle Live-Design (dunkel, Rot/Amber) bleibt unverändert bestehen.
 
+## Ansehen (auch am Handy)
+
+Die Entwürfe liegen zusätzlich in `client/public/` und werden von der Anwendung
+selbst mit ausgeliefert: **`https://<server-adresse>/design-entwuerfe.html`**
+(z. B. auf der Render-Vorschau). Diese Adresse funktioniert auf jedem Gerät ohne
+Anmeldung und kann direkt an den Kunden geschickt werden.
+
+> Hinweis: Vor dem endgültigen Go-Live `client/public/design-entwuerfe.html`
+> löschen, damit die Entwürfe nicht auf der echten Domain erreichbar bleiben.
+
 ## Umsetzung eines Entwurfs
 
 Alle drei Entwürfe verwenden dieselbe Seitenstruktur wie die bestehende App
