@@ -35,6 +35,14 @@ Sicherheitsnetz: Der letzte aktive Administrator kann nicht gelöscht oder deakt
 
 ## Inhalte pflegen
 
+- **Startseite (Hero):** Unter „Startseite" werden das große Bild oben, Überschrift,
+  Einleitungstext und Alternativtext gepflegt (Berechtigung „Seiten & Texte").
+  Bildquelle wahlweise **Eigenes Bild** (Standard: Grafik mit Wappen + First-Responder-Logo,
+  `uploads/hero-standard.png`) oder **Automatisch** (Titelbild des neuesten Einsatzberichts).
+  Zusätzlich einstellbar: Darstellung (füllend für Fotos / eingepasst für Logos) und
+  Stärke der Abdunkelung. Ein Wort der Überschrift zwischen zwei Sternchen (`*Minute*`)
+  wird rot hervorgehoben. „Standard wiederherstellen" setzt alle Werte zurück.
+  Die Standardgrafik lässt sich mit `npx tsx script/make-hero.ts` neu erzeugen.
 - **Beiträge & Einsätze:** Titel, Kategorie, Einsatzstichwort/-ort, Datum, Titelbild, Text mit
   Bild-Upload direkt im Editor. Entwürfe möglich. Beiträge erscheinen automatisch auf
   Startseite, in „Aktuelles", „Einsätze" und im Jahres-Archiv.

@@ -13,6 +13,7 @@ import { AdminLogin, AdminDashboard, AdminKonto } from "@/pages/admin/core";
 import { AdminPosts, AdminPostEditor } from "@/pages/admin/posts";
 import { AdminEvents, AdminVehicles, AdminMembers } from "@/pages/admin/content";
 import { AdminPages, AdminMedia, AdminUsers } from "@/pages/admin/manage";
+import { AdminStartseite } from "@/pages/admin/startseite";
 
 function AppRouter() {
   return (
@@ -41,6 +42,7 @@ function AppRouter() {
       <Route path="/intern/termine" component={AdminEvents} />
       <Route path="/intern/fahrzeuge" component={AdminVehicles} />
       <Route path="/intern/mitglieder" component={AdminMembers} />
+      <Route path="/intern/startseite" component={AdminStartseite} />
       <Route path="/intern/seiten" component={AdminPages} />
       <Route path="/intern/medien" component={AdminMedia} />
       <Route path="/intern/benutzer" component={AdminUsers} />

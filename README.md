@@ -18,6 +18,7 @@ integriertem Verwaltungsbereich. Nachfolger der bisherigen WordPress-Seite
 **Interner Bereich** (`/#/intern`)
 
 - Login mit Benutzern, Rollen und Berechtigungen pro Bereich (Vergabe durch Admin)
+- Startseite pflegen: Hero-Bild (eigenes Bild oder automatisch das neueste Einsatzbild), Überschrift, Einleitungstext, Abdunkelung, Alt-Text
 - Beiträge/Einsätze pflegen: Rich-Text-Editor mit Bild-Upload, Titelbild, Einsatzstichwort/-ort, Entwürfe
 - Termine, Fahrzeuge, Mitglieder, Seitentexte und Bilder-Mediathek pflegen
 - Automatische Bildverkleinerung beim Upload (max. 1600 px)

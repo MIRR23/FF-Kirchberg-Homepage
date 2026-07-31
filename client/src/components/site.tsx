@@ -15,6 +15,19 @@ const NAV = [
   { href: "/archiv", label: "Archiv" },
 ];
 
+/** Hero-Titel rendern: Text zwischen zwei Sternchen ("*Minute*") wird farblich hervorgehoben. */
+export function renderHeroTitle(title: string): ReactNode {
+  return title.split(/\*([^*]+)\*/g).map((part, i) =>
+    i % 2 === 1 ? (
+      <em key={i} className="not-italic text-primary">
+        {part}
+      </em>
+    ) : (
+      part
+    )
+  );
+}
+
 export function SiteHeader() {
   const [location] = useLocation();
   const [open, setOpen] = useState(false);
