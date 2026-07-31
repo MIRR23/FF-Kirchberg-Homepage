@@ -15,7 +15,7 @@ import { RichTextEditor } from "@/components/editor";
 import { AdminLayout, useAdminQuery } from "./core";
 import { formatDate } from "@/lib/format";
 
-function ImageField({
+export function ImageField({
   value, onChange, label = "Bild", aspect = "aspect-[3/2]",
 }: { value: string | null; onChange: (v: string | null) => void; label?: string; aspect?: string }) {
   const { token } = useAuth();

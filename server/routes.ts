@@ -11,8 +11,9 @@ import { storage } from "./storage";
 import {
   insertPostSchema, insertEventSchema, insertVehicleSchema,
   insertMemberSchema, insertPageSchema, insertUserSchema,
-  PERMISSION_AREAS,
+  PERMISSION_AREAS, heroSettingsSchema, DEFAULT_HERO_SETTINGS,
 } from "@shared/schema";
+import type { HeroSettings } from "@shared/schema";
 import type { PermissionArea } from "@shared/schema";
 import {
   hashPassword, verifyPassword, newToken, safeUser,
@@ -38,6 +39,16 @@ const upload = multer({
     cb(null, /image\/(jpeg|png|gif|webp|avif)/.test(file.mimetype));
   },
 });
+
+function getHeroSettings(): HeroSettings {
+  const row = storage.getSetting("hero");
+  if (!row) return DEFAULT_HERO_SETTINGS;
+  try {
+    return heroSettingsSchema.parse({ ...DEFAULT_HERO_SETTINGS, ...JSON.parse(row.value) });
+  } catch {
+    return DEFAULT_HERO_SETTINGS;
+  }
+}
 
 function postArea(categoryId: number): PermissionArea {
   const cat = storage.getCategory(categoryId);
@@ -170,6 +181,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(page);
   });
 
+  app.get("/api/settings/hero", (_req, res) => {
+    res.json(getHeroSettings());
+  });
+
   app.get("/api/stats", (_req, res) => {
     const allPosts = storage.listPosts({ status: "published" });
     const einsatzIds = new Set(storage.listCategories().filter((c) => c.isEinsatz).map((c) => c.id));
@@ -298,6 +313,15 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     const parsed = insertPageSchema.partial().safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ message: "Ungültige Daten" });
     res.json(storage.updatePage(Number(req.params.id), { ...parsed.data, updatedAt: new Date().toISOString() }));
+  });
+
+  // ---------- ADMIN: Startseite / Hero ----------
+  app.put("/api/admin/settings/hero", requireAuth, requirePermission("seiten"), (req, res) => {
+    const parsed = heroSettingsSchema.partial().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Ungültige Daten" });
+    const merged: HeroSettings = { ...getHeroSettings(), ...parsed.data };
+    storage.setSetting("hero", JSON.stringify(merged));
+    res.json(merged);
   });
 
   // ---------- ADMIN: Medien ----------

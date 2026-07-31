@@ -1,10 +1,11 @@
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowRight, CalendarDays, MapPin, Clock } from "lucide-react";
-import type { Post, Event } from "@shared/schema";
+import type { Post, Event, HeroSettings } from "@shared/schema";
+import { DEFAULT_HERO_SETTINGS } from "@shared/schema";
 import { withBase } from "@/lib/auth";
 import { formatDate, dayOfMonth, monthShort } from "@/lib/format";
-import { PublicLayout, PostCard, SectionHead, EmptyState, useCategories, categoryById } from "@/components/site";
+import { PublicLayout, PostCard, SectionHead, EmptyState, useCategories, categoryById, renderHeroTitle } from "@/components/site";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface Stats {
@@ -20,8 +21,12 @@ export default function Home() {
   const { data: events } = useQuery<Event[]>({ queryKey: ["/api/events"] });
   const { data: stats } = useQuery<Stats>({ queryKey: ["/api/stats"] });
   const { data: categories } = useCategories();
+  const { data: heroSettings } = useQuery<HeroSettings>({ queryKey: ["/api/settings/hero"] });
 
+  const hero = heroSettings ?? DEFAULT_HERO_SETTINGS;
   const heroPost = einsaetze?.find((p) => p.featuredImage) ?? latest?.find((p) => p.featuredImage);
+  const heroImage = hero.mode === "auto" ? heroPost?.featuredImage ?? hero.image : hero.image;
+  const overlay = hero.overlay / 100;
   const upcoming = (events ?? [])
     .filter((e) => e.date >= new Date().toISOString().slice(0, 10))
     .slice(0, 3);
@@ -30,18 +35,17 @@ export default function Home() {
     <PublicLayout>
       {/* Hero */}
       <section className="relative overflow-hidden">
-        {heroPost?.featuredImage && (
+        {heroImage && (
           <img
-            src={withBase(heroPost.featuredImage)}
-            alt=""
-            className="absolute inset-0 h-full w-full object-cover"
+            src={withBase(heroImage)}
+            alt={hero.alt}
+            className={`absolute inset-0 h-full w-full ${hero.fit === "contain" ? "object-contain" : "object-cover"}`}
           />
         )}
         <div
           className="absolute inset-0"
           style={{
-            background:
-              "linear-gradient(180deg, hsl(228 11% 7% / .65) 0%, hsl(228 11% 7% / .35) 40%, hsl(228 11% 7% / .94) 88%, hsl(228 11% 7%) 100%)",
+            background: `linear-gradient(180deg, hsl(228 11% 7% / ${overlay.toFixed(2)}) 0%, hsl(228 11% 7% / ${(overlay * 0.55).toFixed(2)}) 40%, hsl(228 11% 7% / .94) 88%, hsl(228 11% 7%) 100%)`,
           }}
         />
         <div className="relative mx-auto max-w-6xl px-4 pb-16 pt-24 md:px-8 md:pb-24 md:pt-36">
@@ -50,11 +54,10 @@ export default function Home() {
             Freiwillige Feuerwehr Kirchberg · seit 1874
           </p>
           <h1 className="mt-4 max-w-[14ch] font-display text-4xl font-semibold leading-[1.05] md:text-6xl">
-            Wenn jede <em className="not-italic text-primary">Minute</em> zählt.
+            {renderHeroTitle(hero.title)}
           </h1>
           <p className="mt-4 max-w-xl text-base leading-relaxed text-foreground/80 md:text-lg">
-            Aktive Einsatzkräfte, moderne Fahrzeuge und eine eigene First-Responder-Einheit –
-            rund um die Uhr einsatzbereit für Kirchberg und das Erdinger Holzland.
+            {hero.intro}
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Link

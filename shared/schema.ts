@@ -133,6 +133,35 @@ export const insertMediaSchema = createInsertSchema(media).omit({ id: true });
 export type InsertMedia = z.infer<typeof insertMediaSchema>;
 export type MediaItem = typeof media.$inferSelect;
 
+// ----- Einstellungen (Schlüssel/Wert, z. B. Hero-Bereich der Startseite) -----
+export const settings = sqliteTable("settings", {
+  key: text("key").primaryKey(),
+  value: text("value").notNull(), // JSON
+});
+export type Setting = typeof settings.$inferSelect;
+
+export const heroSettingsSchema = z.object({
+  mode: z.enum(["auto", "custom"]), // auto = Bild des neuesten Beitrags, custom = eigenes Bild
+  image: z.string().nullable(), // eigenes Bild (bei auto: Ersatzbild)
+  fit: z.enum(["cover", "contain"]), // füllend (Foto) | eingepasst (Logo/Grafik)
+  overlay: z.number().int().min(0).max(100), // Stärke der Abdunkelung
+  title: z.string().max(200), // *Wort* wird farblich hervorgehoben
+  intro: z.string().max(1000),
+  alt: z.string().max(300), // Alternativtext (Barrierefreiheit)
+});
+export type HeroSettings = z.infer<typeof heroSettingsSchema>;
+
+export const DEFAULT_HERO_SETTINGS: HeroSettings = {
+  mode: "custom",
+  image: "/uploads/hero-standard.png",
+  fit: "cover",
+  overlay: 65,
+  title: "Wenn jede *Minute* zählt.",
+  intro:
+    "Aktive Einsatzkräfte, moderne Fahrzeuge und eine eigene First-Responder-Einheit – rund um die Uhr einsatzbereit für Kirchberg und das Erdinger Holzland.",
+  alt: "Wappen der Freiwilligen Feuerwehr Kirchberg und Logo der First Responder Kirchberg",
+};
+
 // ----- API-Hilfstypen -----
 export type SafeUser = Omit<User, "password">;
 export type PostWithCategory = Post & { category: Category | null };

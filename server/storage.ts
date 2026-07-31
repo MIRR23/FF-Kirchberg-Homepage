@@ -1,5 +1,5 @@
 import {
-  users, authTokens, categories, posts, events, vehicles, members, pages, media,
+  users, authTokens, categories, posts, events, vehicles, members, pages, media, settings,
 } from "@shared/schema";
 import type {
   User, InsertUser, Category, InsertCategory, Post, InsertPost,
@@ -85,6 +85,10 @@ CREATE TABLE IF NOT EXISTS pages (
   title TEXT NOT NULL,
   content TEXT NOT NULL DEFAULT '',
   updated_at TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS media (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -253,6 +257,19 @@ export class DatabaseStorage {
   }
   getMedia(id: number) {
     return db.select().from(media).where(eq(media.id, id)).get();
+  }
+
+  // --- Settings (Schlüssel/Wert) ---
+  getSetting(key: string) {
+    return db.select().from(settings).where(eq(settings.key, key)).get();
+  }
+  setSetting(key: string, value: string) {
+    return db
+      .insert(settings)
+      .values({ key, value })
+      .onConflictDoUpdate({ target: settings.key, set: { value } })
+      .returning()
+      .get();
   }
 }
 
