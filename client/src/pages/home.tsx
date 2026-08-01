@@ -39,6 +39,7 @@ export default function Home() {
           <img
             src={withBase(heroImage)}
             alt={hero.alt}
+            aria-hidden={hero.alt ? undefined : true}
             className={`absolute inset-0 h-full w-full ${hero.fit === "contain" ? "object-contain" : "object-cover"}`}
           />
         )}

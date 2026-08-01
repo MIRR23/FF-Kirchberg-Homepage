@@ -1,0 +1,25 @@
+# Fertige Variante zum Selbst-Hosten inkl. dauerhaftem Speicher.
+#
+#   docker compose up -d --build
+#
+# Die Seite ist anschließend unter http://localhost:5000 erreichbar.
+# Datenbank und Bilder bleiben im benannten Volume "ffk-data" erhalten.
+
+services:
+  web:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      NODE_ENV: production
+      PORT: "5000"
+      # Beim ersten Start einmalig migrieren; danach auf "0" setzen, damit
+      # gepflegte Inhalte beim Neustart nicht überschrieben werden.
+      AUTO_MIGRATE: "1"
+    volumes:
+      # Datenbank + hochgeladene Bilder dauerhaft sichern
+      - ffk-data:/app
+    restart: unless-stopped
+
+volumes:
+  ffk-data:

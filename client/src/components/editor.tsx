@@ -62,7 +62,13 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 260 }
       const created = await uploadFiles(token, files);
       ref.current?.focus();
       for (const m of created) {
-        document.execCommand("insertHTML", false, `<img src="${withBase(m.url)}" alt="" /><p></p>`);
+        // Alt-Text aus dem Dateinamen ableiten (Endung/Trennzeichen entfernt) – für Barrierefreiheit
+        const alt = String(m.title || "")
+          .replace(/\.[a-z0-9]+$/i, "")
+          .replace(/[_-]+/g, " ")
+          .trim()
+          .replace(/"/g, "&quot;");
+        document.execCommand("insertHTML", false, `<img src="${withBase(m.url)}" alt="${alt}" /><p></p>`);
       }
       emit();
     } catch (err: any) {
@@ -108,6 +114,9 @@ export function RichTextEditor({ value, onChange, placeholder, minHeight = 260 }
       <div
         ref={ref}
         contentEditable
+        role="textbox"
+        aria-multiline="true"
+        aria-label={placeholder ?? "Textinhalt bearbeiten"}
         data-placeholder={placeholder ?? "Text eingeben …"}
         onInput={emit}
         onBlur={emit}

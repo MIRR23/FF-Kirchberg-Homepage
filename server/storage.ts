@@ -8,7 +8,7 @@ import type {
 } from "@shared/schema";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import Database from "better-sqlite3";
-import { eq, desc, asc, and, like } from "drizzle-orm";
+import { eq, desc, asc, and, like, lt } from "drizzle-orm";
 
 const sqlite = new Database("data.db");
 sqlite.pragma("journal_mode = WAL");
@@ -134,6 +134,10 @@ export class DatabaseStorage {
   }
   deleteToken(token: string) {
     return db.delete(authTokens).where(eq(authTokens.token, token)).run();
+  }
+  /** Entfernt alle Tokens, die vor dem Stichtag erstellt wurden (abgelaufene Sitzungen). */
+  deleteTokensCreatedBefore(cutoffIso: string) {
+    return db.delete(authTokens).where(lt(authTokens.createdAt, cutoffIso)).run();
   }
 
   // --- Categories ---

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
 import type { SafeUser, PermissionArea } from "@shared/schema";
 
 const API_BASE = "__PORT_5000__".startsWith("__") ? "" : "__PORT_5000__";
@@ -18,6 +18,8 @@ export function rewriteContent(html: string): string {
 interface AuthState {
   user: SafeUser | null;
   token: string | null;
+  /** true, solange eine gespeicherte Anmeldung noch geprüft wird (Seiten-Neuladen). */
+  restoring: boolean;
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
   setUser: (u: SafeUser) => void;
@@ -26,9 +28,57 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | null>(null);
 
+const TOKEN_KEY = "ffk_token";
+
+function readStoredToken(): string | null {
+  try {
+    return localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function storeToken(token: string | null) {
+  try {
+    if (token) localStorage.setItem(TOKEN_KEY, token);
+    else localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    /* z. B. Safari im privaten Modus – Anmeldung gilt dann nur für den Tab */
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SafeUser | null>(null);
-  const [token, setToken] = useState<string | null>(null);
+  const [token, setToken] = useState<string | null>(readStoredToken);
+  const [restoring, setRestoring] = useState<boolean>(() => !!readStoredToken());
+
+  // Gespeicherte Anmeldung beim Laden der Seite wiederherstellen,
+  // damit Redakteure nach einem Neuladen (F5) angemeldet bleiben.
+  useEffect(() => {
+    const stored = readStoredToken();
+    if (!stored) return;
+    let cancelled = false;
+    fetch(`${API_BASE}/api/auth/me`, { headers: { Authorization: `Bearer ${stored}` } })
+      .then(async (res) => {
+        if (cancelled) return;
+        if (res.ok) {
+          setUser(await res.json());
+        } else {
+          // Sitzung abgelaufen oder Benutzer deaktiviert
+          storeToken(null);
+          setToken(null);
+        }
+      })
+      .catch(() => {
+        /* Netzwerkfehler: Token behalten, Anmeldemaske erscheint */
+      })
+      .finally(() => {
+        if (!cancelled) setRestoring(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const login = useCallback(async (username: string, password: string) => {
     const res = await fetch(`${API_BASE}/api/auth/login`, {
@@ -41,12 +91,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(body.message || "Anmeldung fehlgeschlagen");
     }
     const data = await res.json();
+    storeToken(data.token);
     setToken(data.token);
     setUser(data.user);
   }, []);
 
   const logout = useCallback(() => {
     const t = token;
+    storeToken(null);
     setToken(null);
     setUser(null);
     if (t) {
@@ -71,7 +123,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   return (
-    <AuthContext.Provider value={{ user, token, login, logout, setUser, can }}>
+    <AuthContext.Provider value={{ user, token, restoring, login, logout, setUser, can }}>
       {children}
     </AuthContext.Provider>
   );
