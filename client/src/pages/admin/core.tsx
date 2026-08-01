@@ -1,9 +1,9 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
   Flame, LogOut, LayoutDashboard, Newspaper, CalendarDays, Truck,
-  Users, FileText, Image, ShieldCheck, Menu, X, KeyRound, ExternalLink, Home,
+  Users, FileText, Image, ShieldCheck, Menu, X, KeyRound, ExternalLink, Home, Loader2,
 } from "lucide-react";
 import type { PermissionArea, Post, Event } from "@shared/schema";
 import { useAuth, authQueryFn, authRequest } from "@/lib/auth";
@@ -22,14 +22,33 @@ export function useAdminQuery<T>(key: string, enabled = true) {
   });
 }
 
+/** Vollflächiger Ladehinweis, während eine gespeicherte Anmeldung geprüft wird. */
+function AuthRestoreScreen() {
+  return (
+    <div className="flex min-h-screen items-center justify-center">
+      <div className="flex items-center gap-3 text-muted-foreground">
+        <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+        <span className="text-sm">Anmeldung wird geprüft …</span>
+      </div>
+    </div>
+  );
+}
+
 // ---------- Login ----------
 export function AdminLogin() {
-  const { login } = useAuth();
+  const { login, user, restoring } = useAuth();
   const { toast } = useToast();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [, navigate] = useLocation();
+
+  // Bereits angemeldet (z. B. über den Footer-Link aufgerufen) -> direkt zur Übersicht
+  useEffect(() => {
+    if (user) navigate("/intern/dashboard");
+  }, [user, navigate]);
+
+  if (restoring) return <AuthRestoreScreen />;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,10 +112,13 @@ const ADMIN_NAV: { href: string; label: string; icon: any; area?: PermissionArea
 ];
 
 export function AdminLayout({ children, title }: { children: ReactNode; title: string }) {
-  const { user, can, logout } = useAuth();
+  const { user, restoring, can, logout } = useAuth();
   const [location, navigate] = useLocation();
   const [open, setOpen] = useState(false);
 
+  if (restoring) {
+    return <AuthRestoreScreen />;
+  }
   if (!user) {
     return <AdminLogin />;
   }

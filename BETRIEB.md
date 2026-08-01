@@ -61,6 +61,43 @@ Von der alten Website (ff-kirchberg.de, WordPress) wurden vollständig übernomm
 - Über uns, Chronik, Historische Brände, Impressum, Datenschutz, Links
 - Fahrzeuge LF 10/6, TSF 8, MZF inkl. Beschreibungen und Fotos
 
+## Vorschau veröffentlichen (Render.com, kostenlos)
+
+Damit sich der Kunde die neue Seite ansehen kann, **ohne** dass vorher die alte Domain
+umgestellt wird, lässt sich die App mit wenigen Klicks als Vorschau ins Netz stellen.
+Die nötige Konfiguration (`render.yaml`) liegt im Repository.
+
+1. Auf <https://render.com> mit dem GitHub-Konto anmelden (kostenlos).
+2. **New → Blueprint** wählen und dieses Repository auswählen.
+3. Render liest `render.yaml`, baut die App und startet sie automatisch.
+4. Nach wenigen Minuten ist die Seite unter einer öffentlichen Adresse erreichbar,
+   z. B. `https://ff-kirchberg-vorschau.onrender.com` – dieser Link kann dem Kunden
+   geschickt werden. Der interne Bereich ist unter `…/#/intern` erreichbar
+   (Zugangsdaten siehe oben).
+
+**Wichtig im kostenlosen Plan:**
+
+- Der Speicher ist **nicht dauerhaft**: Bei einem neuen Deploy oder nach längerer
+  Inaktivität wird er zurückgesetzt. Die Inhalte werden dann beim Start automatisch
+  neu aus `migration-data/` erzeugt (Steuerung über die Variable `AUTO_MIGRATE`).
+  Während der Vorschau im Backend angelegte Inhalte/Bilder gehen dabei verloren –
+  für eine reine Ansichts-Vorschau ist das unkritisch.
+- Der Dienst „schläft“ nach ~15 Minuten ohne Zugriff ein; der erste Aufruf danach
+  dauert einige Sekunden länger (Kaltstart inkl. Neu-Migration).
+
+Für **Dauerbetrieb mit erhaltenen Inhalten**: in `render.yaml` den `disk`-Abschnitt
+aktivieren (kostenpflichtiger Plan) und `AUTO_MIGRATE` auf `0` setzen, oder auf den
+eigenen Server umziehen (siehe unten).
+
+### Alternative: Selbst-Hosten mit Docker
+
+```bash
+docker compose up -d --build      # Seite danach unter http://localhost:5000
+```
+
+Datenbank und Bilder bleiben im Volume `ffk-data` erhalten. Details siehe `Dockerfile`
+und `docker-compose.yml`.
+
 ## Betrieb auf dem Zielserver (Node.js)
 
 ```bash
@@ -90,8 +127,9 @@ wenige Dateien begrenzt.
 
 ## Wichtige Hinweise
 
-- **Sitzungen:** Die Anmeldung gilt, solange der Browser-Tab geöffnet ist (Token im Speicher).
-  Auf dem eigenen Server kann auf Cookie-Sessions umgestellt werden.
+- **Sitzungen:** Die Anmeldung bleibt im Browser gespeichert und überlebt auch ein
+  Neuladen der Seite. Sie läuft nach 30 Tagen automatisch ab, danach ist eine erneute
+  Anmeldung nötig. „Abmelden" beendet die Sitzung sofort.
 - **Aktive/Vorstandschaft:** Nur Beispieldaten – echte Namen bitte im internen Bereich pflegen.
 - **Termine:** Beispieltermine eingetragen – bitte anpassen.
 - **Impressum/Datenschutz:** Inhalte wurden 1:1 von der alten Seite übernommen – bitte auf

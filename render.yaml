@@ -1,0 +1,41 @@
+# Render.com Blueprint – Vorschau-Veröffentlichung der FF-Kirchberg-Homepage.
+#
+# Verwendung:
+#   1. Auf https://render.com mit dem GitHub-Konto anmelden.
+#   2. "New" -> "Blueprint" -> dieses Repository auswählen.
+#   3. Render liest diese Datei und legt den Web-Service automatisch an.
+#
+# Die Datenbank (SQLite) und die Bilder liegen auf dem Server-Dateisystem.
+# Im kostenlosen Plan ist dieser Speicher nicht dauerhaft: Bei jedem Deploy
+# bzw. nach Inaktivität wird er zurückgesetzt – die Inhalte werden dann beim
+# Start automatisch neu aus migration-data/ erzeugt (AUTO_MIGRATE). Im Backend
+# während der Vorschau angelegte Inhalte gehen dabei verloren. Für einen echten
+# Dauerbetrieb stattdessen einen kostenpflichtigen Plan mit "disk" verwenden
+# (siehe auskommentierter Abschnitt unten) bzw. auf den eigenen Server umziehen.
+
+services:
+  - type: web
+    name: ff-kirchberg-vorschau
+    runtime: node
+    plan: free
+    region: frankfurt
+    # devDependencies werden für den Build (vite, esbuild, tsx …) benötigt:
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: node dist/index.cjs
+    healthCheckPath: /api/stats
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22.22.2"
+      - key: AUTO_MIGRATE
+        value: "1"
+
+    # --- Dauerhafter Speicher (nur in kostenpflichtigen Plänen verfügbar) ---
+    # Aktivieren, sobald Inhalte/Bilder dauerhaft erhalten bleiben sollen.
+    # Dann zusätzlich AUTO_MIGRATE auf "0" setzen, damit bestehende Daten
+    # nicht überschrieben werden, und die Migration einmalig manuell ausführen.
+    # disk:
+    #   name: ffk-data
+    #   mountPath: /opt/render/project/src
+    #   sizeGB: 1

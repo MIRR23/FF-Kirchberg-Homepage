@@ -38,45 +38,50 @@ function stripTags(html: string): string {
   return decodeEntities((html || "").replace(/<[^>]*>/g, " ")).replace(/\s+/g, " ").trim();
 }
 
-// ---------- Medien vorbereiten ----------
-const wpMedia = readJson("media");
-
-// Map: WP-Media-ID -> lokale URL, und Datei-Basisname -> lokale URL
+// Map: WP-Media-ID -> lokale URL, und Datei-Basisname -> lokale URL (von prepareMedia befüllt)
 const mediaById = new Map<number, string>();
 const mediaByKey = new Map<string, string>();
 
-fs.mkdirSync(UPLOADS, { recursive: true });
+// ---------- Medien vorbereiten ----------
+/** Liest die Mediathek der alten Seite ein, legt lokale Kopien an und befüllt die Such-Maps. */
+function prepareMedia(): any[] {
+  const wpMedia = readJson("media");
+  mediaById.clear();
+  mediaByKey.clear();
+  fs.mkdirSync(UPLOADS, { recursive: true });
 
-let copied = 0, missing = 0;
-for (const m of wpMedia) {
-  const src = m.source_url as string;
-  if (!src) continue;
-  const basename = path.basename(src.split("?")[0]);
-  const destName = `${m.id}_${basename}`;
-  const dest = path.join(UPLOADS, destName);
-  // Bereits in uploads/wp vorhandene Dateien (z. B. aus dem Repo) direkt verwenden
-  if (!fs.existsSync(dest)) {
-    const localFile = path.join(SRC, "media", `${m.id}_${basename}`);
-    if (!fs.existsSync(localFile) || fs.statSync(localFile).size === 0) {
-      missing++;
-      continue;
+  let copied = 0, missing = 0;
+  for (const m of wpMedia) {
+    const src = m.source_url as string;
+    if (!src) continue;
+    const basename = path.basename(src.split("?")[0]);
+    const destName = `${m.id}_${basename}`;
+    const dest = path.join(UPLOADS, destName);
+    // Bereits in uploads/wp vorhandene Dateien (z. B. aus dem Repo) direkt verwenden
+    if (!fs.existsSync(dest)) {
+      const localFile = path.join(SRC, "media", `${m.id}_${basename}`);
+      if (!fs.existsSync(localFile) || fs.statSync(localFile).size === 0) {
+        missing++;
+        continue;
+      }
+      fs.copyFileSync(localFile, dest);
     }
-    fs.copyFileSync(localFile, dest);
-  }
-  const url = `/uploads/wp/${destName}`;
-  mediaById.set(m.id, url);
+    const url = `/uploads/wp/${destName}`;
+    mediaById.set(m.id, url);
 
-  // Schlüssel: "2024/05/foo.jpg" (Pfad relativ zu uploads, ohne Größensuffix)
-  let relSrc = src;
-  try { relSrc = decodeURIComponent(src); } catch { /* ignore */ }
-  const rel = relSrc.replace(/^.*\/wp-content\/uploads\//, "").split("?")[0];
-  const dir = path.dirname(rel);
-  const ext = path.extname(basename);
-  const stem = basename.slice(0, -ext.length);
-  mediaByKey.set(`${dir}/${stem}${ext}`.toLowerCase(), url);
-  copied++;
+    // Schlüssel: "2024/05/foo.jpg" (Pfad relativ zu uploads, ohne Größensuffix)
+    let relSrc = src;
+    try { relSrc = decodeURIComponent(src); } catch { /* ignore */ }
+    const rel = relSrc.replace(/^.*\/wp-content\/uploads\//, "").split("?")[0];
+    const dir = path.dirname(rel);
+    const ext = path.extname(basename);
+    const stem = basename.slice(0, -ext.length);
+    mediaByKey.set(`${dir}/${stem}${ext}`.toLowerCase(), url);
+    copied++;
+  }
+  console.log(`Medien: ${copied} kopiert, ${missing} fehlen`);
+  return wpMedia;
 }
-console.log(`Medien: ${copied} kopiert, ${missing} fehlen`);
 
 /** Findet die lokale URL für eine alte WP-Upload-URL (auch mit Größensuffix -300x225). */
 function resolveUploadUrl(oldUrl: string): string | null {
@@ -129,7 +134,6 @@ function processContent(html: string): string {
 
 /** Erzeugt ein performantes Vorschaubild (max. 1280px, JPEG) für Titelbilder. */
 const THUMBS = path.join(UPLOADS, "thumbs");
-fs.mkdirSync(THUMBS, { recursive: true });
 const thumbCache = new Map<string, string>();
 async function makeThumb(localUrl: string | null): Promise<string | null> {
   if (!localUrl || !localUrl.startsWith("/uploads/wp/")) return localUrl;
@@ -191,7 +195,10 @@ async function fetchMissingUploads(allHtml: string[]): Promise<void> {
   console.log(`Nachgeladene Dateien: ${added}`);
 }
 
-async function main() {
+export async function runMigration() {
+  fs.mkdirSync(THUMBS, { recursive: true });
+  const wpMedia = prepareMedia();
+
   // ---------- Tabellen leeren ----------
   db.delete(posts).run();
   db.delete(categories).run();
@@ -371,4 +378,12 @@ async function main() {
   console.log("\nMigration abgeschlossen.");
 }
 
-main();
+// Direkter Aufruf (npx tsx server/migrate.ts) startet die Migration sofort.
+// Beim Import (z. B. durch den Server für die Auto-Migration) passiert nichts.
+const invokedDirectly = !!process.argv[1] && /migrate(\.ts|\.js|\.cjs)?$/.test(process.argv[1]);
+if (invokedDirectly) {
+  runMigration().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}
