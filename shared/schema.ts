@@ -171,7 +171,7 @@ export const heroSettingsSchema = z.object({
 export type HeroSettings = z.infer<typeof heroSettingsSchema>;
 
 export const DEFAULT_HERO_SETTINGS: HeroSettings = {
-  mode: "custom",
+  mode: "auto",
   image: "/uploads/hero-standard.png",
   fit: "cover",
   overlay: 65,
@@ -179,6 +179,17 @@ export const DEFAULT_HERO_SETTINGS: HeroSettings = {
   intro:
     "Aktive Einsatzkräfte, moderne Fahrzeuge und eine eigene First-Responder-Einheit – rund um die Uhr einsatzbereit für Kirchberg und das Erdinger Holzland.",
   alt: "Wappen der Freiwilligen Feuerwehr Kirchberg und Logo der First Responder Kirchberg",
+};
+
+// Allgemeine Website-Einstellungen (Schlüssel "site")
+export const siteSettingsSchema = z.object({
+  // Links in Beitrags-/Seitentexten in neuem Tab öffnen
+  linksNewTab: z.boolean(),
+});
+export type SiteSettings = z.infer<typeof siteSettingsSchema>;
+
+export const DEFAULT_SITE_SETTINGS: SiteSettings = {
+  linksNewTab: true,
 };
 
 // ----- API-Hilfstypen -----

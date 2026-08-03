@@ -6,7 +6,7 @@ import type { Post } from "@shared/schema";
 import { cleanHtml } from "@/lib/sanitize";
 import { usePageTitle } from "@/lib/seo";
 import { formatDateLong, formatTime, yearOf } from "@/lib/format";
-import { PublicLayout, PostCard, EmptyState, CategoryBadge, useCategories, categoryById } from "@/components/site";
+import { PublicLayout, PostCard, EmptyState, CategoryBadge, useCategories, categoryById, useSiteSettings } from "@/components/site";
 import { Skeleton } from "@/components/ui/skeleton";
 
 function PageTitle({ kicker, title, intro }: { kicker: string; title: string; intro?: string }) {
@@ -198,6 +198,7 @@ export function PostDetail() {
   const slug = params?.slug ?? "";
   const { data: post, isLoading, error } = useQuery<Post>({ queryKey: [`/api/posts/slug/${slug}`] });
   const { data: categories } = useCategories();
+  const { data: site } = useSiteSettings();
   usePageTitle(post?.title);
 
   return (
@@ -230,7 +231,7 @@ export function PostDetail() {
             <div
               className="prose-content mt-8"
               data-testid="text-post-content"
-              dangerouslySetInnerHTML={{ __html: cleanHtml(post.content) }}
+              dangerouslySetInnerHTML={{ __html: cleanHtml(post.content, { linksNewTab: site?.linksNewTab }) }}
             />
           </>
         )}

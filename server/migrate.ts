@@ -12,6 +12,7 @@ import sharp from "sharp";
 import { storage, db } from "./storage";
 import { users, categories, posts, events, vehicles, members, pages, media } from "@shared/schema";
 import { hashPassword } from "./auth";
+import { IMPRESSUM_HTML, DATENSCHUTZ_HTML, FIRST_RESPONDER_HTML } from "./content";
 
 // Quelle: kompletter Backup-Ordner (../ffk_site) oder die im Repo enthaltenen JSON-Exporte
 const SRC = fs.existsSync(path.resolve(process.cwd(), "../ffk_site/json"))
@@ -301,8 +302,11 @@ export async function runMigration() {
     { slug: "ueber-uns", title: "Über uns", wpSlug: "ueber-uns" },
     { slug: "chronik", title: "Chronik", wpSlug: "geschichte" },
     { slug: "historische-braende", title: "Historische Brände", wpSlug: "historische-braende" },
-    { slug: "impressum", title: "Impressum", wpSlug: "impressum" },
-    { slug: "datenschutz", title: "Datenschutzerklärung", wpSlug: "datenschutzerklaerung" },
+    { slug: "first-responder", title: "First Responder", fallback: FIRST_RESPONDER_HTML },
+    // Impressum/Datenschutz bewusst nicht aus WordPress übernehmen –
+    // aktualisierte Texte nach Rechtsstand 2026 (siehe server/content.ts)
+    { slug: "impressum", title: "Impressum", fallback: IMPRESSUM_HTML },
+    { slug: "datenschutz", title: "Datenschutzerklärung", fallback: DATENSCHUTZ_HTML },
     { slug: "links", title: "Links", wpSlug: "links" },
   ];
   for (const def of pageDefs) {
@@ -319,8 +323,8 @@ export async function runMigration() {
   // ---------- Fahrzeuge (aus Gerätehaus-Unterseiten) ----------
   const vehicleDefs = [
     { wpSlug: "lf106", name: "LF 10/6", type: "Löschgruppenfahrzeug", sort: 1 },
-    { wpSlug: "tsf-8", name: "TSF 8", type: "Tragkraftspritzenfahrzeug", sort: 2 },
-    { wpSlug: "mzf", name: "MZF", type: "Mehrzweckfahrzeug", sort: 3 },
+    { wpSlug: "mzf", name: "MZF", type: "Mehrzweckfahrzeug", sort: 2 },
+    { wpSlug: "tsf-8", name: "TSF 8", type: "Tragkraftspritzenfahrzeug", sort: 3 },
   ];
   for (const v of vehicleDefs) {
     const wp = bySlug.get(v.wpSlug);

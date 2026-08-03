@@ -183,8 +183,10 @@ export function AdminLayout({ children, title }: { children: ReactNode; title: s
 
   return (
     <div className="flex min-h-screen">
-      {/* Desktop sidebar */}
-      <aside className="hidden w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar md:flex">
+      {/* Desktop sidebar – sticky und auf Fensterhöhe begrenzt, damit sie sich bei
+          langen Seiten (z. B. Beitragsliste) nicht in die Länge zieht und
+          „Angemeldet als" immer ohne Scrollen sichtbar bleibt */}
+      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col overflow-y-auto border-r border-sidebar-border bg-sidebar md:flex">
         {navContent}
       </aside>
 

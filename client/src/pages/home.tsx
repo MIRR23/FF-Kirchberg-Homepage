@@ -52,7 +52,7 @@ export default function Home() {
         <div className="relative mx-auto max-w-6xl px-4 pb-16 pt-24 md:px-8 md:pb-24 md:pt-36">
           <p className="flex items-center gap-3 text-xs font-bold uppercase tracking-[0.18em] text-chart-2">
             <span className="inline-block h-0.5 w-7 bg-chart-2" />
-            Freiwillige Feuerwehr Kirchberg · seit 1874
+            Freiwillige Feuerwehr Kirchberg · seit 1879
           </p>
           <h1 className="mt-4 max-w-[14ch] font-display text-4xl font-semibold leading-[1.05] md:text-6xl">
             {renderHeroTitle(hero.title)}

@@ -39,8 +39,9 @@ Sicherheitsnetz: Der letzte aktive Administrator kann nicht gelöscht oder deakt
 
 - **Startseite (Hero):** Unter „Startseite" werden das große Bild oben, Überschrift,
   Einleitungstext und Alternativtext gepflegt (Berechtigung „Seiten & Texte").
-  Bildquelle wahlweise **Eigenes Bild** (Standard: Grafik mit Wappen + First-Responder-Logo,
-  `uploads/hero-standard.png`) oder **Automatisch** (Titelbild des neuesten Einsatzberichts).
+  Bildquelle wahlweise **Automatisch** (Standard: Titelbild des neuesten Einsatzberichts
+  mit Bild; ohne Beitragsbild erscheint das Ersatzbild) oder **Eigenes Bild**
+  (z. B. die Grafik mit Wappen + First-Responder-Logo, `uploads/hero-standard.png`).
   Zusätzlich einstellbar: Darstellung (füllend für Fotos / eingepasst für Logos) und
   Stärke der Abdunkelung. Ein Wort der Überschrift zwischen zwei Sternchen (`*Minute*`)
   wird rot hervorgehoben. „Standard wiederherstellen" setzt alle Werte zurück.
@@ -52,7 +53,16 @@ Sicherheitsnetz: Der letzte aktive Administrator kann nicht gelöscht oder deakt
 - **Fahrzeuge:** Name, Typ, Bild, Beschreibung, Sortierung.
 - **Mitglieder:** Name, Funktion, Gruppe (Vorstandschaft/Aktive), optionales Foto.
   Aktuell sind nur Beispieleinträge gepflegt („Max Mustermann" usw.).
-- **Seiten & Texte:** Über uns, Chronik, Historische Brände, Impressum, Datenschutz, Links.
+- **Seiten & Texte:** Über uns, Chronik, Historische Brände, First Responder,
+  Impressum, Datenschutz, Links. Dort findet sich auch die Einstellung
+  **Link-Verhalten**: Links in Beiträgen und Seiten öffnen standardmäßig in einem
+  neuen Tab; das lässt sich per Häkchen umstellen.
+  Die Seiten Impressum und Datenschutzerklärung sind an den Rechtsstand 2026
+  angepasst (DDG, MStV, DSGVO/TDDDG); inhaltliche Änderungen (z. B. neue
+  Ansprechpartner) können direkt dort gepflegt werden.
+- **Aktive Mannschaft:** Sind unter „Mitglieder" keine Personen in der Gruppe
+  „Aktive Mannschaft" angelegt, wird der Abschnitt auf der öffentlichen
+  „Über uns"-Seite automatisch ausgeblendet.
 - **Dateien (Downloads):** Unter „Dateien" können PDF-, Word-, Excel- oder
   PowerPoint-Dateien (u. a., max. 25 MB) hochgeladen werden – z. B. das Organigramm oder
   die Übungstermin-Übersicht. Jede Datei bekommt einen **dauerhaften Link**
