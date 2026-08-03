@@ -2,18 +2,24 @@ import { ReactNode, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Menu, X, Phone, Flame } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import type { Post, Category } from "@shared/schema";
+import type { Post, Category, SiteSettings } from "@shared/schema";
 import { withBase } from "@/lib/auth";
 import { formatDate, stripHtml, truncate } from "@/lib/format";
 
 const NAV = [
   { href: "/", label: "Aktuelles" },
   { href: "/einsaetze", label: "Einsätze" },
+  { href: "/first-responder", label: "First Responder" },
   { href: "/geraetehaus", label: "Gerätehaus" },
   { href: "/ueber-uns", label: "Über uns" },
   { href: "/termine", label: "Termine" },
   { href: "/archiv", label: "Archiv" },
 ];
+
+/** Allgemeine Website-Einstellungen (z. B. Link-Verhalten in Texten). */
+export function useSiteSettings() {
+  return useQuery<SiteSettings>({ queryKey: ["/api/settings/site"] });
+}
 
 /** Hero-Titel rendern: Text zwischen zwei Sternchen ("*Minute*") wird farblich hervorgehoben. */
 export function renderHeroTitle(title: string): ReactNode {
@@ -113,7 +119,7 @@ export function SiteFooter() {
             <span className="font-display font-semibold">Freiwillige Feuerwehr Kirchberg</span>
           </div>
           <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-            Seit 1874 für die Sicherheit in Kirchberg und dem Erdinger Holzland im Einsatz.
+            Seit 1879 für die Sicherheit in Kirchberg und dem Erdinger Holzland im Einsatz.
           </p>
         </div>
         <div className="text-sm">

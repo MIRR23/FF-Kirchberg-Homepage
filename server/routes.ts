@@ -12,8 +12,9 @@ import {
   insertPostSchema, insertEventSchema, insertVehicleSchema,
   insertMemberSchema, insertPageSchema, insertUserSchema,
   PERMISSION_AREAS, heroSettingsSchema, DEFAULT_HERO_SETTINGS,
+  siteSettingsSchema, DEFAULT_SITE_SETTINGS,
 } from "@shared/schema";
-import type { HeroSettings } from "@shared/schema";
+import type { HeroSettings, SiteSettings } from "@shared/schema";
 import type { PermissionArea } from "@shared/schema";
 import {
   hashPassword, verifyPassword, newToken, safeUser, tokenCutoffIso,
@@ -128,6 +129,16 @@ function getHeroSettings(): HeroSettings {
     return heroSettingsSchema.parse({ ...DEFAULT_HERO_SETTINGS, ...JSON.parse(row.value) });
   } catch {
     return DEFAULT_HERO_SETTINGS;
+  }
+}
+
+function getSiteSettings(): SiteSettings {
+  const row = storage.getSetting("site");
+  if (!row) return DEFAULT_SITE_SETTINGS;
+  try {
+    return siteSettingsSchema.parse({ ...DEFAULT_SITE_SETTINGS, ...JSON.parse(row.value) });
+  } catch {
+    return DEFAULT_SITE_SETTINGS;
   }
 }
 
@@ -273,6 +284,10 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.get("/api/settings/hero", (_req, res) => {
     res.json(getHeroSettings());
+  });
+
+  app.get("/api/settings/site", (_req, res) => {
+    res.json(getSiteSettings());
   });
 
   // Stabiler Datei-Link: /dateien/<slug> liefert immer die aktuell hinterlegte
@@ -435,6 +450,14 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     if (!parsed.success) return res.status(400).json({ message: "Ungültige Daten" });
     const merged: HeroSettings = { ...getHeroSettings(), ...parsed.data };
     storage.setSetting("hero", JSON.stringify(merged));
+    res.json(merged);
+  });
+
+  app.put("/api/admin/settings/site", requireAuth, requirePermission("seiten"), (req, res) => {
+    const parsed = siteSettingsSchema.partial().safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Ungültige Daten" });
+    const merged: SiteSettings = { ...getSiteSettings(), ...parsed.data };
+    storage.setSetting("site", JSON.stringify(merged));
     res.json(merged);
   });
 

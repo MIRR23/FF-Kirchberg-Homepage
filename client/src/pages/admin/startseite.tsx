@@ -174,7 +174,7 @@ export function AdminStartseite() {
             <div className="relative px-6 pb-10 pt-16">
               <p className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.18em] text-chart-2">
                 <span className="inline-block h-0.5 w-5 bg-chart-2" />
-                Freiwillige Feuerwehr Kirchberg · seit 1874
+                Freiwillige Feuerwehr Kirchberg · seit 1879
               </p>
               <h2 className="mt-3 max-w-[14ch] font-display text-2xl font-semibold leading-[1.05]">
                 {renderHeroTitle(form.title)}

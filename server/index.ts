@@ -86,6 +86,19 @@ app.use((req, res, next) => {
     }
   }
 
+  // Neue feste Seiten in bestehenden Datenbanken nachziehen (idempotent):
+  // die Migration läuft nur bei leerer Datenbank, daher hier ergänzen.
+  if (!storage.getPageBySlug("first-responder")) {
+    const { FIRST_RESPONDER_HTML } = await import("./content");
+    storage.createPage({
+      slug: "first-responder",
+      title: "First Responder",
+      content: FIRST_RESPONDER_HTML,
+      updatedAt: new Date().toISOString(),
+    });
+    log("Seite „First Responder“ angelegt.", "seed");
+  }
+
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {

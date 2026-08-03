@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Plus, Trash2, Pencil, Upload, Loader2, Copy, ShieldCheck, FileText, RefreshCw } from "lucide-react";
-import type { Page, MediaItem, SafeUser, PermissionArea, DocumentItem } from "@shared/schema";
+import type { Page, MediaItem, SafeUser, PermissionArea, DocumentItem, SiteSettings } from "@shared/schema";
 import { PERMISSION_AREAS } from "@shared/schema";
 import { useAuth, authRequest, uploadFiles, withBase } from "@/lib/auth";
 import { queryClient } from "@/lib/queryClient";
@@ -33,10 +33,22 @@ export function AdminPages() {
   const { token } = useAuth();
   const { toast } = useToast();
   const { data: pages, isLoading } = useAdminQuery<Page[]>("/api/admin/pages");
+  const { data: siteSettings } = useAdminQuery<SiteSettings>("/api/settings/site");
   const [editing, setEditing] = useState<Page | null>(null);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [busy, setBusy] = useState(false);
+
+  const linksNewTab = siteSettings?.linksNewTab ?? true;
+  const toggleLinksNewTab = async (checked: boolean) => {
+    try {
+      await authRequest(token, "PUT", "/api/admin/settings/site", { linksNewTab: checked });
+      queryClient.invalidateQueries({ queryKey: ["/api/settings/site"] });
+      toast({ title: checked ? "Links öffnen jetzt in einem neuen Tab" : "Links öffnen jetzt im selben Tab" });
+    } catch (err: any) {
+      toast({ title: "Fehler", description: err.message, variant: "destructive" });
+    }
+  };
 
   const open = (p: Page) => {
     setEditing(p);
@@ -82,6 +94,24 @@ export function AdminPages() {
           ))}
         </div>
       )}
+
+      <div className="mt-6 max-w-2xl rounded-2xl border border-card-border bg-card p-5">
+        <h2 className="mb-1 font-semibold">Link-Verhalten</h2>
+        <label className="flex cursor-pointer items-start gap-2.5 text-sm">
+          <Checkbox
+            checked={linksNewTab}
+            onCheckedChange={(c) => toggleLinksNewTab(!!c)}
+            data-testid="checkbox-links-new-tab"
+            className="mt-0.5"
+          />
+          <span>
+            Links in Beiträgen und Seiten in einem neuen Tab öffnen
+            <span className="block text-xs text-muted-foreground">
+              Gilt für alle Links in Texten der Website (Standard: eingeschaltet). Die Hauptnavigation ist davon nicht betroffen.
+            </span>
+          </span>
+        </label>
+      </div>
 
       <Dialog open={!!editing} onOpenChange={(o) => !o && setEditing(null)}>
         <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">

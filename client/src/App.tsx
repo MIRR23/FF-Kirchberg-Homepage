@@ -46,6 +46,7 @@ function AppRouter() {
       <Route path="/geraetehaus" component={Geraetehaus} />
       <Route path="/ueber-uns" component={UeberUns} />
       <Route path="/termine" component={Termine} />
+      <Route path="/first-responder">{() => <StaticPage slug="first-responder" kicker="First Responder" />}</Route>
       <Route path="/chronik">{() => <StaticPage slug="chronik" kicker="Chronik" />}</Route>
       <Route path="/historische-braende">{() => <StaticPage slug="historische-braende" kicker="Chronik" />}</Route>
       <Route path="/impressum">{() => <StaticPage slug="impressum" kicker="Rechtliches" />}</Route>

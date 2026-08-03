@@ -5,7 +5,7 @@ import { withBase } from "@/lib/auth";
 import { cleanHtml } from "@/lib/sanitize";
 import { usePageTitle } from "@/lib/seo";
 import { formatDate, dayOfMonth, monthShort } from "@/lib/format";
-import { PublicLayout, EmptyState } from "@/components/site";
+import { PublicLayout, EmptyState, useSiteSettings } from "@/components/site";
 import { Skeleton } from "@/components/ui/skeleton";
 
 function PageTitle({ kicker, title, intro }: { kicker: string; title: string; intro?: string }) {
@@ -22,6 +22,7 @@ function PageTitle({ kicker, title, intro }: { kicker: string; title: string; in
 export function Geraetehaus() {
   usePageTitle("Gerätehaus & Fahrzeuge");
   const { data: vehicles, isLoading } = useQuery<Vehicle[]>({ queryKey: ["/api/vehicles"] });
+  const { data: site } = useSiteSettings();
 
   return (
     <PublicLayout>
@@ -57,7 +58,7 @@ export function Geraetehaus() {
                   <h2 className="mt-1 font-display text-2xl font-semibold">{v.name}</h2>
                   <div
                     className="prose-content mt-4 text-sm text-foreground/90"
-                    dangerouslySetInnerHTML={{ __html: cleanHtml(v.description) }}
+                    dangerouslySetInnerHTML={{ __html: cleanHtml(v.description, { linksNewTab: site?.linksNewTab }) }}
                   />
                 </div>
               </div>
@@ -74,6 +75,7 @@ export function UeberUns() {
   usePageTitle("Über uns");
   const { data: page } = useQuery<Page>({ queryKey: ["/api/pages/ueber-uns"] });
   const { data: members, isLoading } = useQuery<Member[]>({ queryKey: ["/api/members"] });
+  const { data: site } = useSiteSettings();
 
   const vorstand = members?.filter((m) => m.gruppe === "vorstandschaft") ?? [];
   const aktive = members?.filter((m) => m.gruppe === "aktive") ?? [];
@@ -83,7 +85,7 @@ export function UeberUns() {
       <div className="mx-auto max-w-6xl px-4 py-12 md:px-8 md:py-16">
         <PageTitle kicker="Über uns" title={page?.title || "Die Feuerwehr Kirchberg"} />
         {page ? (
-          <div className="prose-content max-w-3xl" dangerouslySetInnerHTML={{ __html: cleanHtml(page.content) }} />
+          <div className="prose-content max-w-3xl" dangerouslySetInnerHTML={{ __html: cleanHtml(page.content, { linksNewTab: site?.linksNewTab }) }} />
         ) : (
           <Skeleton className="h-40 max-w-3xl" />
         )}
@@ -97,13 +99,12 @@ export function UeberUns() {
           <MemberGrid members={vorstand} />
         )}
 
-        <h2 className="mb-6 mt-16 font-display text-2xl font-semibold">Aktive Mannschaft</h2>
-        {isLoading ? (
-          <Skeleton className="h-40 rounded-2xl" />
-        ) : !aktive.length ? (
-          <EmptyState text="Noch keine Einträge." />
-        ) : (
-          <MemberGrid members={aktive} />
+        {/* Aktive Mannschaft nur zeigen, wenn tatsächlich Mitglieder gepflegt sind */}
+        {(isLoading || aktive.length > 0) && (
+          <>
+            <h2 className="mb-6 mt-16 font-display text-2xl font-semibold">Aktive Mannschaft</h2>
+            {isLoading ? <Skeleton className="h-40 rounded-2xl" /> : <MemberGrid members={aktive} />}
+          </>
         )}
       </div>
     </PublicLayout>
@@ -195,6 +196,7 @@ function EventRow({ event: e }: { event: Event }) {
 // ---------- Statische Seiten ----------
 export function StaticPage({ slug, kicker }: { slug: string; kicker: string }) {
   const { data: page, isLoading, error } = useQuery<Page>({ queryKey: [`/api/pages/${slug}`] });
+  const { data: site } = useSiteSettings();
   usePageTitle(page?.title ?? kicker);
   return (
     <PublicLayout>
@@ -212,7 +214,7 @@ export function StaticPage({ slug, kicker }: { slug: string; kicker: string }) {
             <div
               className="prose-content"
               data-testid={`text-page-${slug}`}
-              dangerouslySetInnerHTML={{ __html: cleanHtml(page.content) }}
+              dangerouslySetInnerHTML={{ __html: cleanHtml(page.content, { linksNewTab: site?.linksNewTab }) }}
             />
           </>
         )}
