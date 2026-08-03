@@ -9,10 +9,10 @@ export function withBase(url: string | null | undefined): string {
   return `${API_BASE}${url}`;
 }
 
-/** Ersetzt /uploads/-Pfade in gespeichertem HTML durch absolute Pfade (für Deployment hinter Proxy). */
+/** Ersetzt /uploads/- und /dateien/-Pfade in gespeichertem HTML durch absolute Pfade (für Deployment hinter Proxy). */
 export function rewriteContent(html: string): string {
   if (!API_BASE) return html;
-  return html.replace(/(src|href)="(\/uploads\/[^"]+)"/g, (_m, attr, path) => `${attr}="${API_BASE}${path}"`);
+  return html.replace(/(src|href)="(\/(?:uploads|dateien)\/[^"]+)"/g, (_m, attr, path) => `${attr}="${API_BASE}${path}"`);
 }
 
 interface AuthState {

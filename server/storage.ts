@@ -1,10 +1,10 @@
 import {
-  users, authTokens, categories, posts, events, vehicles, members, pages, media, settings,
+  users, authTokens, categories, posts, events, vehicles, members, pages, media, documents, settings,
 } from "@shared/schema";
 import type {
   User, InsertUser, Category, InsertCategory, Post, InsertPost,
   Event, InsertEvent, Vehicle, InsertVehicle, Member, InsertMember,
-  Page, InsertPage, MediaItem, InsertMedia,
+  Page, InsertPage, MediaItem, InsertMedia, InsertDocument,
 } from "@shared/schema";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import Database from "better-sqlite3";
@@ -85,6 +85,17 @@ CREATE TABLE IF NOT EXISTS pages (
   title TEXT NOT NULL,
   content TEXT NOT NULL DEFAULT '',
   updated_at TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS documents (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug TEXT NOT NULL UNIQUE,
+  title TEXT NOT NULL,
+  filename TEXT NOT NULL,
+  original_name TEXT NOT NULL DEFAULT '',
+  mime_type TEXT NOT NULL DEFAULT 'application/octet-stream',
+  size INTEGER NOT NULL DEFAULT 0,
+  updated_at TEXT NOT NULL DEFAULT '',
+  updated_by TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY,
@@ -261,6 +272,26 @@ export class DatabaseStorage {
   }
   getMedia(id: number) {
     return db.select().from(media).where(eq(media.id, id)).get();
+  }
+
+  // --- Dokumente (Dateien mit stabilem Link) ---
+  listDocuments() {
+    return db.select().from(documents).orderBy(asc(documents.title)).all();
+  }
+  getDocument(id: number) {
+    return db.select().from(documents).where(eq(documents.id, id)).get();
+  }
+  getDocumentBySlug(slug: string) {
+    return db.select().from(documents).where(eq(documents.slug, slug)).get();
+  }
+  createDocument(d: InsertDocument) {
+    return db.insert(documents).values(d).returning().get();
+  }
+  updateDocument(id: number, d: Partial<InsertDocument>) {
+    return db.update(documents).set(d).where(eq(documents.id, id)).returning().get();
+  }
+  deleteDocument(id: number) {
+    return db.delete(documents).where(eq(documents.id, id)).run();
   }
 
   // --- Settings (Schlüssel/Wert) ---

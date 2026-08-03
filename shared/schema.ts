@@ -11,6 +11,7 @@ export const PERMISSION_AREAS = [
   "mitglieder",
   "seiten",
   "medien",
+  "dateien",
 ] as const;
 export type PermissionArea = (typeof PERMISSION_AREAS)[number];
 
@@ -132,6 +133,24 @@ export const media = sqliteTable("media", {
 export const insertMediaSchema = createInsertSchema(media).omit({ id: true });
 export type InsertMedia = z.infer<typeof insertMediaSchema>;
 export type MediaItem = typeof media.$inferSelect;
+
+// ----- Dateien / Downloads (PDF, Office, …) mit stabilem Link -----
+// Der Link /dateien/<slug> bleibt beim Austauschen der Datei unverändert,
+// sodass Verlinkungen (z. B. Organigramm, Übungsplan) nie angepasst werden müssen.
+export const documents = sqliteTable("documents", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  slug: text("slug").notNull().unique(), // stabiler Link-Bestandteil, wird nie geändert
+  title: text("title").notNull(),
+  filename: text("filename").notNull(), // aktuelle Datei unter uploads/dokumente/
+  originalName: text("original_name").notNull().default(""), // Dateiname beim Download
+  mimeType: text("mime_type").notNull().default("application/octet-stream"),
+  size: integer("size").notNull().default(0), // Bytes
+  updatedAt: text("updated_at").notNull().default(""),
+  updatedBy: text("updated_by").notNull().default(""),
+});
+export const insertDocumentSchema = createInsertSchema(documents).omit({ id: true });
+export type InsertDocument = z.infer<typeof insertDocumentSchema>;
+export type DocumentItem = typeof documents.$inferSelect;
 
 // ----- Einstellungen (Schlüssel/Wert, z. B. Hero-Bereich der Startseite) -----
 export const settings = sqliteTable("settings", {

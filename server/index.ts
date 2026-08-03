@@ -97,7 +97,7 @@ app.use((req, res, next) => {
     if (err instanceof MulterError) {
       const message =
         err.code === "LIMIT_FILE_SIZE"
-          ? "Eine Datei ist zu groß (max. 15 MB pro Bild)."
+          ? "Eine Datei ist zu groß (Bilder max. 30 MB, sonstige Dateien max. 25 MB)."
           : err.code === "LIMIT_FILE_COUNT" || err.code === "LIMIT_UNEXPECTED_FILE"
             ? "Zu viele Dateien auf einmal (max. 20 Bilder pro Upload)."
             : "Der Upload konnte nicht verarbeitet werden.";

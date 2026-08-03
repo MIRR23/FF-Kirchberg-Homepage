@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
   Flame, LogOut, LayoutDashboard, Newspaper, CalendarDays, Truck,
-  Users, FileText, Image, ShieldCheck, Menu, X, KeyRound, ExternalLink, Home, Loader2,
+  Users, FileText, Image, ShieldCheck, Menu, X, KeyRound, ExternalLink, Home, Loader2, FolderOpen,
 } from "lucide-react";
 import type { PermissionArea, Post, Event } from "@shared/schema";
 import { useAuth, authQueryFn, authRequest } from "@/lib/auth";
@@ -108,6 +108,7 @@ const ADMIN_NAV: { href: string; label: string; icon: any; area?: PermissionArea
   { href: "/intern/mitglieder", label: "Mitglieder", icon: Users, area: "mitglieder" },
   { href: "/intern/seiten", label: "Seiten & Texte", icon: FileText, area: "seiten" },
   { href: "/intern/medien", label: "Bilder", icon: Image },
+  { href: "/intern/dateien", label: "Dateien", icon: FolderOpen },
   { href: "/intern/benutzer", label: "Benutzer & Rechte", icon: ShieldCheck, adminOnly: true },
 ];
 

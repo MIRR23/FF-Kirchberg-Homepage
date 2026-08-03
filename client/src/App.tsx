@@ -23,6 +23,7 @@ const AdminVehicles = lazy(() => import("@/pages/admin/content").then((m) => ({ 
 const AdminMembers = lazy(() => import("@/pages/admin/content").then((m) => ({ default: m.AdminMembers })));
 const AdminPages = lazy(() => import("@/pages/admin/manage").then((m) => ({ default: m.AdminPages })));
 const AdminMedia = lazy(() => import("@/pages/admin/manage").then((m) => ({ default: m.AdminMedia })));
+const AdminDocuments = lazy(() => import("@/pages/admin/manage").then((m) => ({ default: m.AdminDocuments })));
 const AdminUsers = lazy(() => import("@/pages/admin/manage").then((m) => ({ default: m.AdminUsers })));
 const AdminStartseite = lazy(() => import("@/pages/admin/startseite").then((m) => ({ default: m.AdminStartseite })));
 
@@ -63,6 +64,7 @@ function AppRouter() {
       <Route path="/intern/startseite" component={AdminStartseite} />
       <Route path="/intern/seiten" component={AdminPages} />
       <Route path="/intern/medien" component={AdminMedia} />
+      <Route path="/intern/dateien" component={AdminDocuments} />
       <Route path="/intern/benutzer" component={AdminUsers} />
 
       <Route component={NotFound} />
