@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Plus, Trash2, Pencil, Upload, Loader2, Copy, ShieldCheck } from "lucide-react";
-import type { Page, MediaItem, SafeUser, PermissionArea } from "@shared/schema";
+import { Plus, Trash2, Pencil, Upload, Loader2, Copy, ShieldCheck, FileText, RefreshCw } from "lucide-react";
+import type { Page, MediaItem, SafeUser, PermissionArea, DocumentItem } from "@shared/schema";
 import { PERMISSION_AREAS } from "@shared/schema";
 import { useAuth, authRequest, uploadFiles, withBase } from "@/lib/auth";
 import { queryClient } from "@/lib/queryClient";
@@ -25,6 +25,7 @@ export const AREA_LABELS: Record<PermissionArea, string> = {
   mitglieder: "Mitglieder",
   seiten: "Seiten & Texte",
   medien: "Bilder löschen",
+  dateien: "Dateien / Downloads",
 };
 
 // =============== SEITEN & TEXTE ===============
@@ -186,6 +187,208 @@ export function AdminMedia() {
           )}
         </>
       )}
+    </AdminLayout>
+  );
+}
+
+// =============== DATEIEN / DOWNLOADS ===============
+// Dateitypen passend zur Server-Whitelist (routes.ts, DOCUMENT_TYPES)
+const DOC_ACCEPT = ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp,.csv,.txt,.rtf,.zip,.jpg,.jpeg,.png,.webp,.gif";
+
+/** Authentifizierter Upload/Änderung eines Dokuments (FormData statt JSON). */
+async function sendDocumentForm(token: string | null, method: string, url: string, fd: FormData): Promise<any> {
+  const res = await fetch(withBase(url), {
+    method,
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: fd,
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.message || "Upload fehlgeschlagen");
+  }
+  return res.json();
+}
+
+function formatSize(bytes: number): string {
+  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1).replace(".", ",")} MB`;
+  return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+}
+
+export function AdminDocuments() {
+  const { token, can } = useAuth();
+  const { toast } = useToast();
+  const { data: docs, isLoading } = useAdminQuery<DocumentItem[]>("/api/admin/documents");
+  const canEdit = can("dateien");
+  const [dialog, setDialog] = useState<{ id?: number; title: string; file: File | null } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [replacingId, setReplacingId] = useState<number | null>(null);
+
+  /** Vollständige öffentliche Adresse des stabilen Links (zum Kopieren/Teilen). */
+  const publicUrl = (slug: string) => new URL(withBase(`/dateien/${slug}`), window.location.origin).href;
+
+  const copyLink = (slug: string) => {
+    navigator.clipboard?.writeText(publicUrl(slug)).then(
+      () => toast({ title: "Link kopiert", description: "Der Link bleibt auch beim Austauschen der Datei gültig." }),
+      () => toast({ title: "Kopieren nicht möglich", variant: "destructive" })
+    );
+  };
+
+  const save = async () => {
+    if (!dialog) return;
+    if (!dialog.id && !dialog.file) {
+      toast({ title: "Bitte eine Datei auswählen", variant: "destructive" });
+      return;
+    }
+    setBusy(true);
+    try {
+      const fd = new FormData();
+      if (dialog.title.trim()) fd.append("title", dialog.title.trim());
+      if (dialog.file) fd.append("file", dialog.file);
+      if (dialog.id) {
+        await sendDocumentForm(token, "PATCH", `/api/admin/documents/${dialog.id}`, fd);
+      } else {
+        await sendDocumentForm(token, "POST", "/api/admin/documents", fd);
+      }
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/documents"] });
+      toast({ title: dialog.id ? "Datei aktualisiert" : "Datei hochgeladen" });
+      setDialog(null);
+    } catch (err: any) {
+      toast({ title: "Fehler", description: err.message, variant: "destructive" });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const replaceFile = async (id: number, files: FileList | null) => {
+    if (!files?.length) return;
+    setReplacingId(id);
+    try {
+      const fd = new FormData();
+      fd.append("file", files[0]);
+      await sendDocumentForm(token, "PATCH", `/api/admin/documents/${id}`, fd);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/documents"] });
+      toast({ title: "Datei ausgetauscht", description: "Alle bestehenden Links zeigen jetzt auf die neue Datei." });
+    } catch (err: any) {
+      toast({ title: "Fehler", description: err.message, variant: "destructive" });
+    } finally {
+      setReplacingId(null);
+    }
+  };
+
+  const remove = async (d: DocumentItem) => {
+    if (!window.confirm(`„${d.title}" wirklich löschen? Bestehende Links auf diese Datei funktionieren dann nicht mehr.`)) return;
+    try {
+      await authRequest(token, "DELETE", `/api/admin/documents/${d.id}`);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/documents"] });
+      toast({ title: "Datei gelöscht" });
+    } catch (err: any) {
+      toast({ title: "Fehler", description: err.message, variant: "destructive" });
+    }
+  };
+
+  return (
+    <AdminLayout title="Dateien">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <p className="max-w-2xl text-sm text-muted-foreground">
+          Dateien wie das Organigramm oder der Übungsplan bekommen hier einen <strong>dauerhaften Link</strong>.
+          Wird die Datei später ausgetauscht, bleibt der Link gleich – nichts muss neu verlinkt werden.
+        </p>
+        {canEdit && (
+          <Button onClick={() => setDialog({ title: "", file: null })} data-testid="button-new-document">
+            <Plus className="mr-1.5 h-4 w-4" /> Neue Datei
+          </Button>
+        )}
+      </div>
+      {isLoading ? (
+        <Skeleton className="h-48 rounded-2xl" />
+      ) : (
+        <div className="overflow-hidden rounded-2xl border border-card-border bg-card">
+          {(docs ?? []).map((d) => (
+            <div key={d.id} data-testid={`row-admin-document-${d.id}`} className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3 text-sm last:border-b-0">
+              <FileText className="h-5 w-5 shrink-0 text-muted-foreground" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium">{d.title}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {[d.originalName, formatSize(d.size), d.updatedAt && `Stand: ${formatDate(d.updatedAt)}`, d.updatedBy && `von ${d.updatedBy}`]
+                    .filter(Boolean).join(" · ")}
+                </p>
+              </div>
+              <button
+                onClick={() => copyLink(d.slug)}
+                title="Dauerhaften Link kopieren"
+                data-testid={`button-copy-document-${d.id}`}
+                className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 font-mono text-xs text-muted-foreground hover:text-foreground"
+              >
+                <Copy className="h-3.5 w-3.5" /> /dateien/{d.slug}
+              </button>
+              <a
+                href={publicUrl(d.slug)}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"
+              >
+                Ansehen
+              </a>
+              {canEdit && (
+                <>
+                  <label className="cursor-pointer p-1.5 text-muted-foreground hover:text-foreground" title="Datei austauschen (Link bleibt gleich)">
+                    {replacingId === d.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+                    <input
+                      type="file" accept={DOC_ACCEPT} className="hidden"
+                      onChange={(e) => { replaceFile(d.id, e.target.files); e.target.value = ""; }}
+                      data-testid={`input-replace-document-${d.id}`}
+                    />
+                  </label>
+                  <button className="p-1.5 text-muted-foreground hover:text-foreground" onClick={() => setDialog({ id: d.id, title: d.title, file: null })} title="Umbenennen" data-testid={`button-edit-document-${d.id}`}>
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                  <button className="p-1.5 text-muted-foreground hover:text-destructive" onClick={() => remove(d)} title="Löschen" data-testid={`button-delete-document-${d.id}`}>
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </>
+              )}
+            </div>
+          ))}
+          {!docs?.length && (
+            <p className="px-4 py-10 text-center text-sm text-muted-foreground">
+              Noch keine Dateien hinterlegt.{canEdit ? " Über „Neue Datei“ kann z. B. das Organigramm als PDF hochgeladen werden." : ""}
+            </p>
+          )}
+        </div>
+      )}
+
+      <Dialog open={!!dialog} onOpenChange={(o) => !o && setDialog(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{dialog?.id ? "Datei bearbeiten" : "Neue Datei"}</DialogTitle>
+          </DialogHeader>
+          {dialog && (
+            <div className="space-y-4">
+              <div className="space-y-1.5">
+                <Label>Bezeichnung {dialog.id ? "" : "(daraus entsteht der dauerhafte Link)"}</Label>
+                <Input
+                  value={dialog.title}
+                  onChange={(e) => setDialog({ ...dialog, title: e.target.value })}
+                  placeholder="z. B. Organigramm der Feuerwehr"
+                  data-testid="input-document-title"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>{dialog.id ? "Neue Datei (optional – ersetzt die bisherige)" : "Datei *"}</Label>
+                <Input
+                  type="file" accept={DOC_ACCEPT}
+                  onChange={(e) => setDialog({ ...dialog, file: e.target.files?.[0] ?? null })}
+                  data-testid="input-document-file"
+                />
+                <p className="text-xs text-muted-foreground">PDF, Word, Excel, PowerPoint u. a. – max. 25 MB.</p>
+              </div>
+              <Button onClick={save} disabled={busy} className="w-full" data-testid="button-save-document">
+                {busy ? <><Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> Speichern …</> : <><Upload className="mr-1.5 h-4 w-4" /> Speichern</>}
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 }

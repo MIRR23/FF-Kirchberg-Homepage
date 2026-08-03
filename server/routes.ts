@@ -21,6 +21,7 @@ import {
 } from "./auth";
 
 const UPLOAD_DIR = path.resolve(process.cwd(), "uploads");
+const DOC_DIR = path.join(UPLOAD_DIR, "dokumente");
 
 const upload = multer({
   storage: multer.diskStorage({
@@ -34,11 +35,91 @@ const upload = multer({
       cb(null, `${Date.now()}_${safe}`);
     },
   }),
-  limits: { fileSize: 15 * 1024 * 1024 },
+  // Handy-Fotos dürfen groß sein – sie werden nach dem Upload ohnehin verkleinert
+  limits: { fileSize: 30 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
     cb(null, /image\/(jpeg|png|gif|webp|avif)/.test(file.mimetype));
   },
 });
+
+/**
+ * Verkleinert und optimiert ein hochgeladenes Bild für das Web:
+ * EXIF-Drehung übernehmen, auf max. 1600 px begrenzen, als WebP (Qualität 82)
+ * neu kodieren. Metadaten (inkl. GPS-Position vom Handy) werden dabei entfernt.
+ * Animierte GIFs bleiben unverändert. Gibt den neuen Dateinamen zurück.
+ */
+async function optimizeImage(file: Express.Multer.File): Promise<string> {
+  const meta = await sharp(file.path).metadata();
+  if (!meta.width || !meta.height) throw new Error("kein Bild");
+  if (file.mimetype === "image/gif") return file.filename; // Animationen nicht zerstören
+
+  const tmp = `${file.path}.tmp`;
+  await sharp(file.path)
+    .rotate()
+    .resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true })
+    .webp({ quality: 82 })
+    .toFile(tmp);
+  fs.unlinkSync(file.path);
+  const newFilename = file.filename.replace(/\.[a-z0-9]+$/i, "") + ".webp";
+  const newPath = path.join(path.dirname(file.path), newFilename);
+  fs.renameSync(tmp, newPath);
+  file.filename = newFilename;
+  file.path = newPath;
+  return newFilename;
+}
+
+// ---------- Dateien / Downloads ----------
+// Erlaubte Dateitypen (Endung -> Content-Type). Bewusst keine HTML/SVG-Dateien,
+// da diese im Browser Skripte ausführen könnten.
+const DOCUMENT_TYPES: Record<string, string> = {
+  ".pdf": "application/pdf",
+  ".doc": "application/msword",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ".xls": "application/vnd.ms-excel",
+  ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ".ppt": "application/vnd.ms-powerpoint",
+  ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  ".odt": "application/vnd.oasis.opendocument.text",
+  ".ods": "application/vnd.oasis.opendocument.spreadsheet",
+  ".odp": "application/vnd.oasis.opendocument.presentation",
+  ".csv": "text/csv",
+  ".txt": "text/plain",
+  ".rtf": "application/rtf",
+  ".zip": "application/zip",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".png": "image/png",
+  ".webp": "image/webp",
+  ".gif": "image/gif",
+};
+export const DOCUMENT_EXTENSIONS = Object.keys(DOCUMENT_TYPES).map((e) => e.slice(1)).join(", ").toUpperCase();
+
+const docUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => {
+      fs.mkdirSync(DOC_DIR, { recursive: true });
+      cb(null, DOC_DIR);
+    },
+    filename: (_req, file, cb) => {
+      const safe = file.originalname.normalize("NFKD").replace(/[^a-zA-Z0-9._-]/g, "_");
+      cb(null, `${Date.now()}_${safe}`);
+    },
+  }),
+  limits: { fileSize: 25 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    if (path.extname(file.originalname).toLowerCase() in DOCUMENT_TYPES) return cb(null, true);
+    const err = new Error(`Dieser Dateityp ist nicht erlaubt. Erlaubt sind: ${DOCUMENT_EXTENSIONS}.`) as Error & { status: number };
+    err.status = 400;
+    cb(err);
+  },
+});
+
+function deleteDocumentFile(filename: string) {
+  const fp = path.join(DOC_DIR, filename);
+  if (fp.startsWith(DOC_DIR) && fs.existsSync(fp)) {
+    try { fs.unlinkSync(fp); } catch { /* ignore */ }
+  }
+}
 
 function getHeroSettings(): HeroSettings {
   const row = storage.getSetting("hero");
@@ -74,8 +155,16 @@ function uniquePostSlug(base: string, excludeId?: number): string {
   }
 }
 
+function uniqueDocumentSlug(base: string): string {
+  let slug = base;
+  let i = 2;
+  while (storage.getDocumentBySlug(slug)) slug = `${base}-${i++}`;
+  return slug;
+}
+
 export async function registerRoutes(httpServer: Server, app: Express): Promise<Server> {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+  fs.mkdirSync(DOC_DIR, { recursive: true });
   app.set("trust proxy", 1); // hinter Reverse-Proxy (X-Forwarded-For) korrekt arbeiten
   app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: false }));
   app.use("/uploads", express.static(UPLOAD_DIR, { maxAge: "7d" }));
@@ -184,6 +273,28 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.get("/api/settings/hero", (_req, res) => {
     res.json(getHeroSettings());
+  });
+
+  // Stabiler Datei-Link: /dateien/<slug> liefert immer die aktuell hinterlegte
+  // Datei aus. Beim Austauschen der Datei bleibt der Link unverändert gültig.
+  app.get("/dateien/:slug", (req, res) => {
+    const doc = storage.getDocumentBySlug(String(req.params.slug));
+    if (!doc) return res.status(404).json({ message: "Datei nicht gefunden" });
+    const fp = path.join(DOC_DIR, doc.filename);
+    if (!fp.startsWith(DOC_DIR) || !fs.existsSync(fp)) {
+      return res.status(404).json({ message: "Datei nicht gefunden" });
+    }
+    // Nicht cachen: hinter dem Link kann jederzeit eine neue Version liegen
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Content-Type", doc.mimeType);
+    // PDFs und Bilder direkt im Browser anzeigen, alles andere herunterladen
+    const inline = doc.mimeType === "application/pdf" || doc.mimeType.startsWith("image/");
+    const asciiName = (doc.originalName || doc.filename).normalize("NFKD").replace(/[^\x20-\x7E]/g, "_").replace(/["\\]/g, "_");
+    res.setHeader(
+      "Content-Disposition",
+      `${inline ? "inline" : "attachment"}; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(doc.originalName || doc.filename)}`
+    );
+    res.sendFile(fp);
   });
 
   app.get("/api/stats", (_req, res) => {
@@ -334,18 +445,13 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   app.post("/api/admin/media", requireAuth, upload.array("files", 20), async (req, res) => {
     const files = (req.files as Express.Multer.File[]) ?? [];
-    if (!files.length) return res.status(400).json({ message: "Keine Bilder hochgeladen (JPG, PNG, GIF, WebP, max. 15 MB)" });
-    // Validieren (muss ein echtes Bild sein) und große Bilder verkleinern (max. 1600px Breite)
+    if (!files.length) return res.status(400).json({ message: "Keine Bilder hochgeladen (JPG, PNG, GIF, WebP, max. 30 MB)" });
+    // Validieren (muss ein echtes Bild sein) und automatisch fürs Web optimieren:
+    // verkleinern (max. 1600 px), als WebP neu kodieren, Metadaten/GPS entfernen.
     const validFiles: Express.Multer.File[] = [];
     for (const f of files) {
       try {
-        const meta = await sharp(f.path).metadata();
-        if (!meta.width || !meta.height) throw new Error("kein Bild");
-        if (meta.width > 1600) {
-          const tmp = `${f.path}.tmp`;
-          await sharp(f.path).rotate().resize({ width: 1600 }).toFile(tmp);
-          fs.renameSync(tmp, f.path);
-        }
+        await optimizeImage(f);
         validFiles.push(f);
       } catch {
         // Ungültige Datei löschen statt behalten
@@ -373,6 +479,64 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       const fp = path.join(process.cwd(), item.url.replace(/^\//, ""));
       if (fp.startsWith(UPLOAD_DIR) && fs.existsSync(fp)) fs.unlinkSync(fp);
       storage.deleteMedia(item.id);
+    }
+    res.json({ ok: true });
+  });
+
+  // ---------- ADMIN: Dateien / Downloads ----------
+  // Alle angemeldeten Benutzer sehen die Liste (um Links kopieren zu können),
+  // Anlegen/Austauschen/Löschen erfordert die Berechtigung "dateien".
+  app.get("/api/admin/documents", requireAuth, (_req, res) => {
+    res.json(storage.listDocuments());
+  });
+
+  app.post("/api/admin/documents", requireAuth, requirePermission("dateien"), docUpload.single("file"), (req, res) => {
+    const file = req.file;
+    if (!file) {
+      return res.status(400).json({ message: `Keine gültige Datei hochgeladen (erlaubt: ${DOCUMENT_EXTENSIONS}, max. 25 MB)` });
+    }
+    const title = String(req.body?.title ?? "").trim() || file.originalname.replace(/\.[a-z0-9]+$/i, "");
+    const slug = uniqueDocumentSlug(slugify(title));
+    const doc = storage.createDocument({
+      slug,
+      title,
+      filename: file.filename,
+      originalName: file.originalname,
+      mimeType: DOCUMENT_TYPES[path.extname(file.originalname).toLowerCase()] ?? "application/octet-stream",
+      size: file.size,
+      updatedAt: new Date().toISOString(),
+      updatedBy: req.currentUser!.displayName,
+    });
+    res.json(doc);
+  });
+
+  // Austauschen der Datei und/oder Umbenennen – der Slug (und damit der Link) bleibt stabil
+  app.patch("/api/admin/documents/:id", requireAuth, requirePermission("dateien"), docUpload.single("file"), (req, res) => {
+    const existing = storage.getDocument(Number(req.params.id));
+    if (!existing) {
+      if (req.file) deleteDocumentFile(req.file.filename);
+      return res.status(404).json({ message: "Nicht gefunden" });
+    }
+    const update: Record<string, unknown> = {};
+    const title = String(req.body?.title ?? "").trim();
+    if (title) update.title = title;
+    if (req.file) {
+      deleteDocumentFile(existing.filename);
+      update.filename = req.file.filename;
+      update.originalName = req.file.originalname;
+      update.mimeType = DOCUMENT_TYPES[path.extname(req.file.originalname).toLowerCase()] ?? "application/octet-stream";
+      update.size = req.file.size;
+    }
+    update.updatedAt = new Date().toISOString();
+    update.updatedBy = req.currentUser!.displayName;
+    res.json(storage.updateDocument(existing.id, update as any));
+  });
+
+  app.delete("/api/admin/documents/:id", requireAuth, requirePermission("dateien"), (req, res) => {
+    const existing = storage.getDocument(Number(req.params.id));
+    if (existing) {
+      deleteDocumentFile(existing.filename);
+      storage.deleteDocument(existing.id);
     }
     res.json({ ok: true });
   });

@@ -30,6 +30,8 @@ Der Administrator kann unter **Benutzer & Rechte** Benutzer anlegen und je Berei
 - **Mitglieder** – Vorstandschaft und Aktive
 - **Seiten & Texte** – feste Seiten (Über uns, Chronik, Impressum, …)
 - **Bilder löschen** – Löschen in der Mediathek (Hochladen darf jeder angemeldete Benutzer)
+- **Dateien / Downloads** – Dateien mit dauerhaftem Link hochladen, austauschen und löschen
+  (die Liste samt Link-Kopieren sieht jeder angemeldete Benutzer)
 
 Sicherheitsnetz: Der letzte aktive Administrator kann nicht gelöscht oder deaktiviert werden.
 
@@ -51,6 +53,25 @@ Sicherheitsnetz: Der letzte aktive Administrator kann nicht gelöscht oder deakt
 - **Mitglieder:** Name, Funktion, Gruppe (Vorstandschaft/Aktive), optionales Foto.
   Aktuell sind nur Beispieleinträge gepflegt („Max Mustermann" usw.).
 - **Seiten & Texte:** Über uns, Chronik, Historische Brände, Impressum, Datenschutz, Links.
+- **Dateien (Downloads):** Unter „Dateien" können PDF-, Word-, Excel- oder
+  PowerPoint-Dateien (u. a., max. 25 MB) hochgeladen werden – z. B. das Organigramm oder
+  die Übungstermin-Übersicht. Jede Datei bekommt einen **dauerhaften Link**
+  (`/dateien/<kürzel>`), der z. B. über das Link-Symbol im Texteditor in Beiträge oder
+  Seiten eingefügt werden kann. Wird die Datei später über „Austauschen" ersetzt,
+  bleibt der Link unverändert gültig – es muss nichts neu verlinkt werden.
+
+### Automatische Bild-Optimierung
+
+Alle hochgeladenen Bilder (Mediathek, Titelbilder, Fotos im Editor – auch große
+Handy-Fotos bis 30 MB) werden beim Upload automatisch fürs Web aufbereitet:
+
+- Verkleinerung auf maximal 1600 px Kantenlänge
+- Neukodierung als platzsparendes WebP (aus ~10 MB Handy-Foto wird typischerweise < 1 MB)
+- Übernahme der EXIF-Drehung (Hochformat-Fotos stehen richtig)
+- Entfernung aller Metadaten – **inklusive GPS-Standort** vom Handy (Datenschutz)
+
+Redakteure müssen also nichts beachten und können Fotos direkt vom Handy hochladen.
+Nur animierte GIFs bleiben unverändert.
 
 ## Migrierte Inhalte
 
