@@ -67,6 +67,11 @@ SFTP-Programm (z. B. [FileZilla](https://filezilla-project.org), kostenlos).
 
 4. Speichern. Die restlichen Einstellungen können unverändert bleiben.
 
+> **Optional für Fortgeschrittene:** `config.php` kann stattdessen eine Ebene
+> **über** dem Web-Ordner liegen. Die Website findet sie dort automatisch, und
+> die Zugangsdaten wären selbst dann geschützt, wenn PHP auf dem Server einmal
+> nicht ausgeführt würde.
+
 ## Schritt 4: PHP-Einstellungen prüfen
 
 Damit Redakteure große Handy-Fotos hochladen können, müssen im Timme-Panel

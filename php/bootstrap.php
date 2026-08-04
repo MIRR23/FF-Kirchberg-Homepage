@@ -24,7 +24,13 @@ date_default_timezone_set('Europe/Berlin');
 mb_internal_encoding('UTF-8');
 
 // ---------- Konfiguration laden ----------
+// Regulär liegt config.php neben index.html. Wer sie zusätzlich absichern will,
+// kann sie stattdessen eine Ebene ÜBER dem Web-Ordner ablegen – dann kommt sie
+// selbst dann nicht ins Netz, wenn PHP einmal nicht ausgeführt würde.
 $ffkConfigFile = FFK_ROOT . '/config.php';
+if (!is_file($ffkConfigFile) && is_file(dirname(FFK_ROOT) . '/config.php')) {
+    $ffkConfigFile = dirname(FFK_ROOT) . '/config.php';
+}
 if (!is_file($ffkConfigFile)) {
     http_response_code(500);
     header('Content-Type: application/json; charset=utf-8');

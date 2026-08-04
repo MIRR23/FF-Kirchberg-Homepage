@@ -64,6 +64,8 @@ async function main() {
   if (!withZip) return;
 
   console.log("ZIP-Dateien packen …");
+  // config.php enthält Zugangsdaten und darf nie in ein Paket geraten.
+  await rm(path.join(DEPLOY, "config.php"), { force: true });
   await zip("ffk-homepage-komplett.zip", ["."]);
   await zip(
     "ffk-homepage-update.zip",
