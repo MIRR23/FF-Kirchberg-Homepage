@@ -14,3 +14,6 @@ data.db-journal
 
 *.log
 .DS_Store
+
+# Serverkonfiguration mit Zugangsdaten – nur auf dem Server, nie im Repository
+config.php
