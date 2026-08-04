@@ -1,7 +1,7 @@
 import { lazy, Suspense, useEffect } from "react";
 import { Switch, Route, Router, useLocation } from "wouter";
 import { useHashLocation } from "wouter/use-hash-location";
-import { withBase } from "@/lib/auth";
+import { apiFetch } from "@/lib/auth";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -48,7 +48,7 @@ function VisitTracker() {
     }
     const referrer = referrerSent ? "" : document.referrer;
     referrerSent = true;
-    fetch(withBase("/api/stats/hit"), {
+    apiFetch("/api/stats/hit", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ path: location, referrer }),

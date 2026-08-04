@@ -321,7 +321,8 @@ function ffk_handle_request(string $method, string $path): void
         foreach (ffk_list_posts(['status' => 'published']) as $p) {
             $years[mb_substr($p['publishedAt'], 0, 4, 'UTF-8')] = true;
         }
-        $years = array_keys($years);
+        // Als Zeichenketten ausgeben – PHP wandelt Array-Schlüssel sonst in Zahlen
+        $years = array_map('strval', array_keys($years));
         sort($years);
         ffk_json(array_values(array_reverse($years)));
     }

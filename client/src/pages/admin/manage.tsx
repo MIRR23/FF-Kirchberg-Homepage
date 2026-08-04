@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Plus, Trash2, Pencil, Upload, Loader2, Copy, ShieldCheck, FileText, RefreshCw } from "lucide-react";
 import type { Page, MediaItem, SafeUser, PermissionArea, DocumentItem, SiteSettings } from "@shared/schema";
 import { PERMISSION_AREAS } from "@shared/schema";
-import { useAuth, authRequest, uploadFiles, withBase } from "@/lib/auth";
+import { useAuth, authRequest, uploadFiles, withBase, apiFetch, fileUrl } from "@/lib/auth";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -227,7 +227,7 @@ const DOC_ACCEPT = ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp,.csv,.t
 
 /** Authentifizierter Upload/Änderung eines Dokuments (FormData statt JSON). */
 async function sendDocumentForm(token: string | null, method: string, url: string, fd: FormData): Promise<any> {
-  const res = await fetch(withBase(url), {
+  const res = await apiFetch(url, {
     method,
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: fd,
@@ -254,7 +254,7 @@ export function AdminDocuments() {
   const [replacingId, setReplacingId] = useState<number | null>(null);
 
   /** Vollständige öffentliche Adresse des stabilen Links (zum Kopieren/Teilen). */
-  const publicUrl = (slug: string) => new URL(withBase(`/dateien/${slug}`), window.location.origin).href;
+  const publicUrl = (slug: string) => new URL(fileUrl(slug), window.location.href).href;
 
   const copyLink = (slug: string) => {
     navigator.clipboard?.writeText(publicUrl(slug)).then(
@@ -349,7 +349,7 @@ export function AdminDocuments() {
                 data-testid={`button-copy-document-${d.id}`}
                 className="flex items-center gap-1.5 rounded-full border border-border px-3 py-1.5 font-mono text-xs text-muted-foreground hover:text-foreground"
               >
-                <Copy className="h-3.5 w-3.5" /> /dateien/{d.slug}
+                <Copy className="h-3.5 w-3.5" /> /datei.php?s={d.slug}
               </button>
               <a
                 href={publicUrl(d.slug)}

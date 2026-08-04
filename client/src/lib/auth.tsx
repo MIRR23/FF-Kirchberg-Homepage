@@ -1,7 +1,24 @@
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
 import type { SafeUser, PermissionArea } from "@shared/schema";
 
-const API_BASE = "__PORT_5000__".startsWith("__") ? "" : "__PORT_5000__";
+// ---------------------------------------------------------------------------
+// Adressbildung für das PHP-Backend
+// ---------------------------------------------------------------------------
+// Die Website liegt als reine Dateisammlung im Web-Ordner (Managed Hosting
+// ohne Rewrites). Es gibt deshalb genau zwei PHP-Einstiegspunkte:
+//
+//   /api.php?r=/posts/slug/xyz   statt   /api/posts/slug/xyz
+//   /datei.php?s=xyz             statt   /dateien/xyz
+//
+// Diese Datei ist die EINZIGE Stelle, an der API-Adressen gebildet werden –
+// alle übrigen Client-Dateien arbeiten unverändert mit den /api/…-Pfaden.
+// Die Query-Variante wird bewusst von vornherein genutzt: sie funktioniert auf
+// jedem Server, ohne dass PATH_INFO konfiguriert sein muss, und kostet keine
+// zusätzliche Anfrage zum Ausprobieren. api.php akzeptiert zusätzlich
+// PATH_INFO, falls später hübsche Adressen per Rewrite aktiviert werden.
+
+/** Verzeichnis, in dem index.html/api.php liegen (leer = Wurzel des Webservers). */
+const API_BASE = "";
 
 export function withBase(url: string | null | undefined): string {
   if (!url) return "";
@@ -9,10 +26,48 @@ export function withBase(url: string | null | undefined): string {
   return `${API_BASE}${url}`;
 }
 
-/** Ersetzt /uploads/- und /dateien/-Pfade in gespeichertem HTML durch absolute Pfade (für Deployment hinter Proxy). */
+/**
+ * Bildet einen bisherigen API-Pfad (`/api/...`) auf den Front-Controller ab.
+ * Eine eventuell vorhandene Query-Zeichenkette bleibt erhalten.
+ */
+export function apiUrl(path: string): string {
+  if (!path.startsWith("/api/")) return withBase(path);
+  const [route, query] = path.slice(4).split("?");
+  const suffix = query ? `&${query}` : "";
+  return `${API_BASE}/api.php?r=${encodeURIComponent(route)}${suffix}`;
+}
+
+/** Adresse eines Dokuments mit stabilem Link (früher /dateien/<slug>). */
+export function fileUrl(slug: string): string {
+  return `${API_BASE}/datei.php?s=${encodeURIComponent(slug)}`;
+}
+
+/**
+ * Passt in gespeichertem HTML enthaltene Pfade an das Deployment an:
+ * `/dateien/<slug>` wird zu `/datei.php?s=<slug>`. `/uploads/…` bleibt
+ * unverändert – diese Dateien liefert der Webserver direkt aus.
+ * Bereits umgeschriebene Links werden nicht erneut angefasst.
+ */
 export function rewriteContent(html: string): string {
-  if (!API_BASE) return html;
-  return html.replace(/(src|href)="(\/(?:uploads|dateien)\/[^"]+)"/g, (_m, attr, path) => `${attr}="${API_BASE}${path}"`);
+  return html.replace(
+    /(src|href)="\/dateien\/([^"?#]+)"/g,
+    (_m, attr, slug) => `${attr}="${fileUrl(decodeURIComponent(slug))}"`,
+  );
+}
+
+/**
+ * Führt eine API-Anfrage aus. PATCH/PUT/DELETE werden als POST mit
+ * `_method`-Angabe gesendet: Manche Managed-Hosting-Konfigurationen lassen
+ * diese Methoden nicht durch, und PHP wertet Formulardaten (Datei-Uploads)
+ * ohnehin nur bei POST aus. api.php stellt die Methode wieder her.
+ */
+export function apiFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const method = (init.method ?? "GET").toUpperCase();
+  if (method === "GET" || method === "POST") {
+    return fetch(apiUrl(path), init);
+  }
+  const url = apiUrl(path);
+  return fetch(`${url}${url.includes("?") ? "&" : "?"}_method=${method}`, { ...init, method: "POST" });
 }
 
 interface AuthState {
@@ -58,7 +113,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const stored = readStoredToken();
     if (!stored) return;
     let cancelled = false;
-    fetch(`${API_BASE}/api/auth/me`, { headers: { Authorization: `Bearer ${stored}` } })
+    apiFetch("/api/auth/me", { headers: { Authorization: `Bearer ${stored}` } })
       .then(async (res) => {
         if (cancelled) return;
         if (res.ok) {
@@ -81,7 +136,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(async (username: string, password: string) => {
-    const res = await fetch(`${API_BASE}/api/auth/login`, {
+    const res = await apiFetch("/api/auth/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password }),
@@ -102,7 +157,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setToken(null);
     setUser(null);
     if (t) {
-      fetch(`${API_BASE}/api/auth/logout`, {
+      apiFetch("/api/auth/logout", {
         method: "POST",
         headers: { Authorization: `Bearer ${t}` },
       }).catch(() => {});
@@ -145,7 +200,7 @@ export async function authRequest(
   const headers: Record<string, string> = {};
   if (token) headers.Authorization = `Bearer ${token}`;
   if (data !== undefined) headers["Content-Type"] = "application/json";
-  const res = await fetch(`${API_BASE}${url}`, {
+  const res = await apiFetch(url, {
     method,
     headers,
     body: data !== undefined ? JSON.stringify(data) : undefined,
@@ -160,8 +215,9 @@ export async function authRequest(
 /** Authentifizierter Datei-Upload (FormData). */
 export async function uploadFiles(token: string | null, files: FileList | File[]): Promise<any[]> {
   const fd = new FormData();
-  Array.from(files).forEach((f) => fd.append("files", f));
-  const res = await fetch(`${API_BASE}/api/admin/media`, {
+  // PHP fasst gleichnamige Felder nur mit "[]" zu einer Liste zusammen
+  Array.from(files).forEach((f) => fd.append("files[]", f));
+  const res = await apiFetch("/api/admin/media", {
     method: "POST",
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: fd,
@@ -176,7 +232,7 @@ export async function uploadFiles(token: string | null, files: FileList | File[]
 /** Authentifizierter GET als Query-Funktion. */
 export function authQueryFn(token: string | null) {
   return async ({ queryKey }: { queryKey: readonly unknown[] }) => {
-    const res = await fetch(`${API_BASE}${queryKey.join("/")}`, {
+    const res = await apiFetch(queryKey.join("/"), {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
     if (!res.ok) {

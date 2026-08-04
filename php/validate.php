@@ -45,7 +45,7 @@ function ffk_field_string(array $b, string $key, array &$out, array $opts = []):
 
     if (!array_key_exists($key, $b)) {
         if ($required) {
-            return "Das Feld „$key\" fehlt.";
+            return "Das Feld „{$key}“ fehlt.";
         }
         if (array_key_exists('default', $opts)) {
             $out[$key] = $opts['default'];
@@ -55,7 +55,7 @@ function ffk_field_string(array $b, string $key, array &$out, array $opts = []):
     $v = $b[$key];
     if ($v === null) {
         if (!$nullable) {
-            return "Das Feld „$key\" darf nicht leer sein.";
+            return "Das Feld „{$key}“ darf nicht leer sein.";
         }
         $out[$key] = null;
         return null;
@@ -64,13 +64,13 @@ function ffk_field_string(array $b, string $key, array &$out, array $opts = []):
         $v = (string) $v;
     }
     if (!is_string($v)) {
-        return "Das Feld „$key\" muss Text sein.";
+        return "Das Feld „{$key}“ muss Text sein.";
     }
     if ($required && trim($v) === '') {
-        return "Das Feld „$key\" darf nicht leer sein.";
+        return "Das Feld „{$key}“ darf nicht leer sein.";
     }
     if (isset($opts['max']) && mb_strlen($v, 'UTF-8') > $opts['max']) {
-        return "Das Feld „$key\" ist zu lang (maximal {$opts['max']} Zeichen).";
+        return "Das Feld „{$key}“ ist zu lang (maximal {$opts['max']} Zeichen).";
     }
     $out[$key] = $v;
     return null;
@@ -82,7 +82,7 @@ function ffk_field_int(array $b, string $key, array &$out, array $opts = []): ?s
     $required = $opts['required'] ?? false;
     if (!array_key_exists($key, $b)) {
         if ($required) {
-            return "Das Feld „$key\" fehlt.";
+            return "Das Feld „{$key}“ fehlt.";
         }
         if (array_key_exists('default', $opts)) {
             $out[$key] = $opts['default'];
@@ -91,14 +91,14 @@ function ffk_field_int(array $b, string $key, array &$out, array $opts = []): ?s
     }
     $v = $b[$key];
     if (!is_int($v) && !(is_string($v) && preg_match('/^-?\d+$/', $v) === 1) && !is_bool($v)) {
-        return "Das Feld „$key\" muss eine Zahl sein.";
+        return "Das Feld „{$key}“ muss eine Zahl sein.";
     }
     $n = (int) $v;
     if (isset($opts['min']) && $n < $opts['min']) {
-        return "Das Feld „$key\" ist zu klein.";
+        return "Das Feld „{$key}“ ist zu klein.";
     }
     if (isset($opts['max']) && $n > $opts['max']) {
-        return "Das Feld „$key\" ist zu groß.";
+        return "Das Feld „{$key}“ ist zu groß.";
     }
     $out[$key] = $n;
     return null;
@@ -116,7 +116,7 @@ function ffk_field_float_nullable(array $b, string $key, array &$out): ?string
         return null;
     }
     if (!is_numeric($v)) {
-        return "Das Feld „$key\" muss eine Zahl sein.";
+        return "Das Feld „{$key}“ muss eine Zahl sein.";
     }
     $out[$key] = (float) $v;
     return null;
@@ -127,13 +127,13 @@ function ffk_field_enum(array $b, string $key, array $allowed, array &$out, arra
 {
     if (!array_key_exists($key, $b)) {
         if ($opts['required'] ?? false) {
-            return "Das Feld „$key\" fehlt.";
+            return "Das Feld „{$key}“ fehlt.";
         }
         return null;
     }
     $v = $b[$key];
     if (!is_string($v) || !in_array($v, $allowed, true)) {
-        return "Für „$key\" ist nur " . implode(' oder ', $allowed) . ' erlaubt.';
+        return "Für „{$key}“ ist nur " . implode(' oder ', $allowed) . ' erlaubt.';
     }
     $out[$key] = $v;
     return null;
@@ -147,7 +147,7 @@ function ffk_field_bool(array $b, string $key, array &$out): ?string
     }
     $v = $b[$key];
     if (!is_bool($v)) {
-        return "Das Feld „$key\" muss ja oder nein sein.";
+        return "Das Feld „{$key}“ muss ja oder nein sein.";
     }
     $out[$key] = $v;
     return null;
