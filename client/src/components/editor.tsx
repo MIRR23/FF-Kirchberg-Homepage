@@ -3,12 +3,13 @@ import { Bold, Italic, List, Heading2, Link2, ImagePlus, Loader2 } from "lucide-
 import { useAuth, uploadFiles, withBase } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 
-const API_BASE = "__PORT_5000__".startsWith("__") ? "" : "__PORT_5000__";
-
-/** Entfernt den Deployment-Prefix aus Bild-URLs, damit relative Pfade gespeichert werden. */
+/**
+ * Speichert Adressen ohne Domain, damit Inhalte einen Umzug (andere Domain,
+ * anderer Server) unbeschadet überstehen. Betrifft eingefügte Bilder
+ * (/uploads/…) genauso wie Datei-Links (/datei.php?s=…).
+ */
 function normalizeHtml(html: string): string {
-  if (!API_BASE) return html;
-  return html.split(API_BASE).join("");
+  return html.split(`${window.location.origin}/`).join("/");
 }
 
 interface EditorProps {

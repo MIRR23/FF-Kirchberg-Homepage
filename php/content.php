@@ -1,3 +1,4 @@
+<?php
 /**
  * Feste Standard-Inhalte für Seiten, die nicht (mehr) aus der alten
  * WordPress-Website übernommen werden. Die Texte sind im internen Bereich
@@ -6,9 +7,16 @@
  * Hinweis Impressum/Datenschutz: Die Texte orientieren sich am Rechtsstand
  * 2026 (DDG statt TMG, MStV, DSGVO, TDDDG, Wegfall der EU-ODR-Plattform),
  * ersetzen aber keine Rechtsberatung im Einzelfall.
+ *
+ * ACHTUNG: Diese Datei wurde 1:1 aus der bisherigen server/content.ts
+ * übernommen. Änderungen bitte hier pflegen.
  */
 
-export const IMPRESSUM_HTML = `
+declare(strict_types=1);
+
+defined('FFK_APP') || exit;
+
+const FFK_IMPRESSUM_HTML = <<<'HTML'
 <h3>Angaben gemäß § 5 Digitale-Dienste-Gesetz (DDG)</h3>
 <p>Freiwillige Feuerwehr Kirchberg<br />
 Baustarring 4<br />
@@ -61,9 +69,9 @@ schriftlichen Zustimmung des jeweiligen Autors bzw. Erstellers. Soweit die Inhal
 dieser Seite nicht vom Betreiber erstellt wurden, werden die Urheberrechte Dritter
 beachtet. Sollten Sie trotzdem auf eine Urheberrechtsverletzung aufmerksam werden,
 bitten wir um einen entsprechenden Hinweis.</p>
-`.trim();
+HTML;
 
-export const DATENSCHUTZ_HTML = `
+const FFK_DATENSCHUTZ_HTML = <<<'HTML'
 <h3>1. Verantwortlicher</h3>
 <p>Verantwortlicher im Sinne der Datenschutz-Grundverordnung (DSGVO) ist:</p>
 <p>Freiwillige Feuerwehr Kirchberg<br />
@@ -155,9 +163,9 @@ Verarbeitung Ihrer personenbezogenen Daten zu beschweren. Zuständig für uns is
 Bayerische Landesamt für Datenschutzaufsicht (BayLDA), Promenade 18, 91522 Ansbach,
 <a href="https://www.lda.bayern.de">www.lda.bayern.de</a>.</p>
 <p><em>Stand: August 2026</em></p>
-`.trim();
+HTML;
 
-export const FIRST_RESPONDER_HTML = `
+const FFK_FIRST_RESPONDER_HTML = <<<'HTML'
 <p>Die <strong>First Responder</strong> (auch „Helfer vor Ort") der Freiwilligen Feuerwehr
 Kirchberg sind speziell ausgebildete Einsatzkräfte, die bei medizinischen Notfällen in
 Kirchberg und Umgebung alarmiert werden – <strong>zusätzlich</strong> zum regulären
@@ -189,4 +197,4 @@ gehören unter anderem ein Notfallrucksack, ein automatisierter externer Defibri
 <p>Die First Responder ersetzen <strong>nicht</strong> den Notruf: Wählen Sie bei einem
 Notfall immer die <strong>112</strong>. Die Leitstelle entscheidet über die Alarmierung
 aller erforderlichen Kräfte.</p>
-`.trim();
+HTML;

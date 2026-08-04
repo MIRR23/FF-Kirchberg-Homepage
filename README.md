@@ -21,19 +21,25 @@ integriertem Verwaltungsbereich. Nachfolger der bisherigen WordPress-Seite
 - Startseite pflegen: Hero-Bild (eigenes Bild oder automatisch das neueste Einsatzbild), Überschrift, Einleitungstext, Abdunkelung, Alt-Text
 - Beiträge/Einsätze pflegen: Rich-Text-Editor mit Bild-Upload, Titelbild, Einsatzstichwort/-ort, Entwürfe
 - Termine, Fahrzeuge, Mitglieder, Seitentexte und Bilder-Mediathek pflegen
-- Automatische Bildverkleinerung beim Upload (max. 1600 px)
+- Automatische Bildoptimierung beim Upload (max. 1600 px, WebP, Metadaten inkl. GPS entfernt)
 - Benutzerverwaltung inkl. Passwort-Reset durch Admin, Selbstbedienung „Passwort ändern"
 
 Details zu Bedienung und Betrieb: siehe **[BETRIEB.md](BETRIEB.md)**.
 
 ## Technik
 
-| Ebene     | Technologie                                                        |
-| --------- | ------------------------------------------------------------------ |
+| Ebene     | Technologie                                                                   |
+| --------- | ----------------------------------------------------------------------------- |
 | Frontend  | React 18, Vite, Tailwind CSS, shadcn/ui, wouter (Hash-Routing), TanStack Query |
-| Backend   | Node.js, Express, Drizzle ORM, Multer + Sharp (Bild-Uploads)        |
-| Datenbank | SQLite (`data.db`) – Umstieg auf MariaDB vorgesehen, siehe BETRIEB.md |
-| Auth      | Token-basiert (Bearer), Passwörter mit scrypt gehasht               |
+| Backend   | PHP 8 (getestet mit 8.4, ausgelegt für 8.5), PDO                              |
+| Datenbank | MariaDB / MySQL (utf8mb4)                                                     |
+| Bilder    | Imagick, ersatzweise GD (Verkleinerung, WebP, Metadaten entfernen)            |
+| Auth      | Token-basiert (Bearer), Passwörter mit `password_hash()`                      |
+
+Die Seite läuft auf gewöhnlichem PHP-Webhosting: Dateien in den Web-Ordner
+laden, Datenbank-Zugangsdaten in `config.php` eintragen, fertig. Kein Node.js
+auf dem Server, kein Docker, kein dauerhaft laufender Prozess und keine
+nginx-Rewrites nötig.
 
 ### Projektstruktur
 
@@ -42,16 +48,14 @@ client/            React-Frontend
   src/pages/       Öffentliche Seiten (home, posts, info)
   src/pages/admin/ Verwaltungsbereich (core, posts, content, manage)
   src/components/  Layout, Karten, Rich-Text-Editor, shadcn/ui
-  src/lib/         Auth-Context, API-Helfer, Formatierung
-server/
-  index.ts         Express-Bootstrap (vom Template)
-  routes.ts        Alle API-Routen inkl. Auth & Berechtigungsprüfung
-  storage.ts       Datenbankzugriff (zentral, hier MariaDB-Umstieg ansetzen)
-  auth.ts          Passwort-Hashing, Token, Middleware
-  migrate.ts       Migration der alten WordPress-Inhalte
-shared/schema.ts   Datenmodell (Drizzle) + Zod-Schemas + Berechtigungs-Bereiche
-migration-data/    WordPress-Export (JSON) der alten Website
-uploads/           Bilder & PDFs (wp/ = migriert, wp/thumbs/ = Vorschaubilder, neu/ = Uploads)
+  src/lib/         auth.tsx (Anmeldung + Adressbildung), queryClient, sanitize
+shared/schema.ts   Datenmodell als TypeScript-Typen
+api.php            Front-Controller für alle API-Endpunkte
+datei.php          Downloads über den stabilen Link
+php/               Backend (Datenbank, Auth, Routen, Bilder, Statistik, Migration)
+migration-data/    WordPress-Export der alten Website
+uploads/           Bilder & PDFs (wp/ = migriert, neu/ = Uploads, dokumente/ = Downloads)
+tests/e2e.mjs      End-to-End-Test (Playwright)
 BETRIEB.md         Betriebs- und Übergabedokumentation
 ```
 
@@ -59,46 +63,49 @@ BETRIEB.md         Betriebs- und Übergabedokumentation
 
 ```bash
 npm install
-npm run dev          # Dev-Server (Frontend + API) auf Port 5000
+php -S 127.0.0.1:8000 -t .   # Backend (braucht config.php, siehe config.example.php)
+npm run dev                   # Frontend mit Hot Reload auf Port 5173
 ```
 
 Standard-Logins siehe BETRIEB.md (bitte nach Inbetriebnahme ändern).
 
-## Produktion
+## Deployment
 
 ```bash
-npm run build
-NODE_ENV=production PORT=5000 node dist/index.cjs
+npm run build     # -> dist/deploy/ + dist/ffk-homepage-{komplett,update}.zip
 ```
 
-`uploads/` und `data.db` liegen im Projektverzeichnis und müssen mitgesichert werden.
-Ist die Datenbank beim Start leer, wird sie automatisch aus `migration-data/` befüllt
-(`AUTO_MIGRATE`, mit `AUTO_MIGRATE=0` abschaltbar).
+Das ZIP enthält genau den Inhalt für den Web-Ordner. Denselben Schritt führt
+GitHub Actions bei jedem Push auf `main` aus; das Ergebnis liegt dort unter
+**Actions → Artifacts** zum Herunterladen bereit.
 
-## Vorschau für den Kunden veröffentlichen
+Schritt-für-Schritt-Anleitung für die Installation bei Timme Hosting:
+**[BETRIEB.md](BETRIEB.md)**.
 
-Die Seite lässt sich als kostenlose Vorschau ins Netz stellen, ohne die alte Domain
-umzustellen – per **Render.com** (Blueprint `render.yaml`) oder **Docker**
-(`docker compose up -d --build`). Schritt-für-Schritt-Anleitung:
-**[BETRIEB.md → Vorschau veröffentlichen](BETRIEB.md)**.
+## Testen
+
+```bash
+npm run check                 # TypeScript
+node tests/e2e.mjs            # End-to-End gegen dist/deploy (Playwright)
+find . -name "*.php" -not -path "./node_modules/*" -print0 | xargs -0 -n1 php -l
+```
+
+## Datenbank neu aufbauen
+
+Die Datenbank füllt sich beim ersten Aufruf der Website automatisch aus
+`migration-data/json/` (WordPress-Export) und den Bildern in `uploads/wp/`:
+Kategorien, Beiträge, Seiten, Fahrzeuge, Beispiel-Mitglieder/-Termine sowie die
+Standard-Benutzer. Um von vorn zu beginnen, die Tabellen der Datenbank leeren –
+beim nächsten Aufruf läuft die Erstbefüllung erneut. Abschaltbar über
+`'auto_migrate' => false` in `config.php`.
+
+## Vorherige Fassung
+
+Der Stand vor dem PHP-Umbau (Node.js/Express + SQLite, Docker, Render) liegt
+vollständig im Branch **`nodejs-express-version`**.
 
 Eine Bewertung des Projekts (Stärken, Verbesserungen, umgesetzte Änderungen) steht in
 **[BEWERTUNG.md](BEWERTUNG.md)**.
-
-## Datenbank neu aufbauen (Migration)
-
-Die Datenbank (`data.db`) ist nicht im Repository. Sie lässt sich jederzeit vollständig
-aus den mitgelieferten Daten erzeugen:
-
-```bash
-npx tsx server/migrate.ts
-```
-
-Das Skript nutzt `migration-data/json/` (WordPress-Export) und die bereits in
-`uploads/wp/` liegenden Mediendateien, erzeugt Vorschaubilder, legt Kategorien,
-Beiträge, Seiten, Fahrzeuge, Beispiel-Mitglieder/-Termine sowie die Standard-Benutzer an.
-Fehlende, in Inhalten verlinkte Dateien werden – falls die alte Website noch erreichbar
-ist – automatisch nachgeladen.
 
 ## Hinweise
 
