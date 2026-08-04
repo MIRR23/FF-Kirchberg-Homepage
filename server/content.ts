@@ -75,7 +75,9 @@ E-Mail: <a href="mailto:vorstand@ff-kirchberg.de">vorstand@ff-kirchberg.de</a></
 <p>Der Schutz Ihrer persönlichen Daten ist uns wichtig. Wir verarbeiten personenbezogene
 Daten nur, soweit dies für die Bereitstellung einer funktionsfähigen Website sowie
 unserer Inhalte erforderlich ist. Diese Website verwendet <strong>keine Cookies zu
-Analyse- oder Werbezwecken</strong> und setzt keine Tracking- oder Statistik-Dienste ein.</p>
+Analyse- oder Werbezwecken</strong> und bindet keine externen Tracking-Dienste ein.
+Zur Reichweitenmessung wird ausschließlich eine anonyme, cookielose Zählung auf
+unserem eigenen Server erstellt (siehe Abschnitt 4).</p>
 <h3>3. Bereitstellung der Website und Server-Logfiles</h3>
 <p>Beim Aufruf dieser Website werden durch den Hosting-Anbieter automatisch Informationen
 in sogenannten Server-Logfiles gespeichert, die Ihr Browser übermittelt. Dies sind:
@@ -85,7 +87,21 @@ mit anderen Datenquellen zusammengeführt. Die Verarbeitung erfolgt auf Grundlag
 Art. 6 Abs. 1 lit. f DSGVO aus unserem berechtigten Interesse an der technisch
 fehlerfreien und sicheren Bereitstellung der Website. Die Logdaten werden nach kurzer
 Zeit automatisch gelöscht.</p>
-<h3>4. Kontaktaufnahme per E-Mail</h3>
+<h3>4. Anonyme Besucherstatistik (ohne Cookies)</h3>
+<p>Um zu erfahren, wie viele Personen unsere Website besuchen und welche Inhalte
+interessieren, zählen wir Seitenaufrufe auf unserem eigenen Server – ohne Cookies,
+ohne Fremdanbieter und ohne Bildung von Nutzungsprofilen. Zur Erkennung, ob ein
+Aufruf am selben Tag vom selben Besucher stammt, wird aus IP-Adresse und
+Browser-Kennung zusammen mit einem <strong>täglich wechselnden Zufallswert</strong> eine
+anonyme Prüfsumme gebildet; die IP-Adresse selbst wird dabei nicht gespeichert.
+Nach dem Tageswechsel ist keine Zuordnung mehr möglich, gespeichert bleiben
+ausschließlich anonyme Tagessummen (Aufrufe, Besucherzahl, aufgerufene Seiten,
+verweisende Websites). Ein Personenbezug ist damit ausgeschlossen; soweit
+überhaupt personenbezogene Daten kurzzeitig verarbeitet werden, erfolgt dies auf
+Grundlage unseres berechtigten Interesses an einer datensparsamen
+Reichweitenmessung (Art. 6 Abs. 1 lit. f DSGVO). Auf Endgeräte wird dabei nicht
+zugegriffen und nichts gespeichert (§ 25 TDDDG findet keine Anwendung).</p>
+<h3>5. Kontaktaufnahme per E-Mail</h3>
 <p>Wenn Sie uns per E-Mail kontaktieren, werden Ihre Angaben (E-Mail-Adresse, Name,
 Inhalt der Nachricht) zum Zweck der Bearbeitung der Anfrage und für den Fall von
 Anschlussfragen bei uns gespeichert. Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO
@@ -93,7 +109,7 @@ Anschlussfragen bei uns gespeichert. Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DS
 DSGVO, sofern die Anfrage auf den Abschluss eines Vertrags abzielt. Diese Daten geben
 wir nicht ohne Ihre Einwilligung weiter und löschen sie, sobald sie für die Bearbeitung
 nicht mehr erforderlich sind.</p>
-<h3>5. Fotos von Einsätzen und Veranstaltungen</h3>
+<h3>6. Fotos von Einsätzen und Veranstaltungen</h3>
 <p>Zur Öffentlichkeitsarbeit veröffentlichen wir auf dieser Website Berichte und Fotos
 von Einsätzen, Übungen und Veranstaltungen der Feuerwehr. Rechtsgrundlage ist unser
 berechtigtes Interesse an der Darstellung unserer Arbeit (Art. 6 Abs. 1 lit. f DSGVO).
@@ -101,14 +117,14 @@ Dabei achten wir darauf, die Interessen abgebildeter Personen zu wahren; Aufnahm
 Verletzten oder anderen schutzwürdigen Personen werden nicht veröffentlicht. Sollten
 Sie auf einem Foto abgebildet sein und mit der Veröffentlichung nicht einverstanden
 sein, genügt eine kurze Nachricht an uns – wir entfernen das Bild dann zeitnah.</p>
-<h3>6. Eingebettete Videos (YouTube/Vimeo)</h3>
+<h3>7. Eingebettete Videos (YouTube/Vimeo)</h3>
 <p>In einzelnen Beiträgen können Videos der Anbieter YouTube (Google Ireland Ltd.) oder
 Vimeo (Vimeo Inc.) eingebettet sein. Erst wenn Sie ein solches Video abspielen, werden
 Daten (u. a. Ihre IP-Adresse) an den jeweiligen Anbieter übertragen; dabei können auch
 Daten in die USA übermittelt werden. Näheres entnehmen Sie den Datenschutzhinweisen der
 Anbieter: <a href="https://policies.google.com/privacy">Google/YouTube</a>,
 <a href="https://vimeo.com/privacy">Vimeo</a>.</p>
-<h3>7. Kartendarstellung (OpenStreetMap)</h3>
+<h3>8. Kartendarstellung (OpenStreetMap)</h3>
 <p>Bei Einsatzberichten und Terminen kann ein Standort auf einer Karte angezeigt werden.
 Die Karte wird aus Datenschutzgründen <strong>erst nach einem Klick</strong> auf
 „Karte anzeigen" geladen (2-Klick-Lösung). Erst dann werden Kartenausschnitte vom
@@ -120,20 +136,20 @@ Rechtsgrundlage ist Ihre Einwilligung durch den Klick (Art. 6 Abs. 1 lit. a DSGV
 <a href="https://osmfoundation.org/wiki/Privacy_Policy">Datenschutzerklärung der OSM Foundation</a>.
 Der zusätzlich angebotene Link „In Google Maps öffnen" führt erst nach dem Anklicken
 zu Google; dabei gelten die Datenschutzhinweise von Google.</p>
-<h3>8. Interner Bereich (nur für Mitglieder/Redakteure)</h3>
+<h3>9. Interner Bereich (nur für Mitglieder/Redakteure)</h3>
 <p>Für die Pflege der Website existiert ein zugangsgeschützter interner Bereich. Bei der
 Anmeldung wird ein Anmelde-Token im lokalen Speicher (localStorage) des Browsers
 abgelegt. Dies ist für die Bereitstellung dieser ausdrücklich gewünschten Funktion
 technisch erforderlich (§ 25 Abs. 2 Nr. 2 TDDDG) und betrifft ausschließlich angemeldete
 Redakteure, nicht die Besucher der Website.</p>
-<h3>9. Ihre Rechte</h3>
+<h3>10. Ihre Rechte</h3>
 <p>Sie haben gegenüber uns folgende Rechte hinsichtlich der Sie betreffenden
 personenbezogenen Daten: Recht auf Auskunft (Art. 15 DSGVO), Berichtigung (Art. 16
 DSGVO), Löschung (Art. 17 DSGVO), Einschränkung der Verarbeitung (Art. 18 DSGVO),
 Datenübertragbarkeit (Art. 20 DSGVO) sowie Widerspruch gegen die Verarbeitung (Art. 21
 DSGVO). Eine erteilte Einwilligung können Sie jederzeit mit Wirkung für die Zukunft
 widerrufen.</p>
-<h3>10. Beschwerderecht bei der Aufsichtsbehörde</h3>
+<h3>11. Beschwerderecht bei der Aufsichtsbehörde</h3>
 <p>Sie haben zudem das Recht, sich bei einer Datenschutz-Aufsichtsbehörde über die
 Verarbeitung Ihrer personenbezogenen Daten zu beschweren. Zuständig für uns ist das
 Bayerische Landesamt für Datenschutzaufsicht (BayLDA), Promenade 18, 91522 Ansbach,

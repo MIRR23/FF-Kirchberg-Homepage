@@ -3,6 +3,7 @@ import express from "express";
 import type { Server } from "node:http";
 import path from "node:path";
 import fs from "node:fs";
+import crypto from "node:crypto";
 import multer from "multer";
 import sharp from "sharp";
 import helmet from "helmet";
@@ -140,6 +141,67 @@ function getSiteSettings(): SiteSettings {
   } catch {
     return DEFAULT_SITE_SETTINGS;
   }
+}
+
+// ---------- Anonyme Besucherstatistik ----------
+// Zählung ohne Cookies: Besucher werden pro Tag über einen Hash aus IP +
+// Browser-Kennung + täglich wechselndem Zufallswert (Salt) erkannt. Das Salt
+// des Vortags wird verworfen, damit niemand über Tage hinweg verfolgbar ist.
+
+/** Heutiges Datum (JJJJ-MM-TT) in deutscher Zeitzone – Tagesgrenzen wie erwartet. */
+function statsToday(): string {
+  return new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Berlin" });
+}
+
+let statsSaltCache: { date: string; salt: string } | null = null;
+function statsDailySalt(today: string): string {
+  if (statsSaltCache?.date === today) return statsSaltCache.salt;
+  const row = storage.getSetting("stats_salt");
+  if (row) {
+    try {
+      const parsed = JSON.parse(row.value) as { date: string; salt: string };
+      if (parsed.date === today && parsed.salt) {
+        statsSaltCache = parsed;
+        return parsed.salt;
+      }
+    } catch {
+      /* neu erzeugen */
+    }
+  }
+  const salt = crypto.randomBytes(16).toString("hex");
+  storage.setSetting("stats_salt", JSON.stringify({ date: today, salt }));
+  storage.purgeStatsSeenBefore(today); // Tageswechsel: alte Hashes löschen
+  statsSaltCache = { date: today, salt };
+  return salt;
+}
+
+const BOT_UA = /bot|crawl|spider|slurp|preview|fetch|monitor|lighthouse|headless|python|curl|wget|scrapy|httpclient|feed/i;
+
+/** Anzeigename für einen gezählten Pfad (z. B. Beitragstitel statt Slug). */
+const STATIC_PAGE_LABELS: Record<string, string> = {
+  "/": "Startseite",
+  "/aktuelles": "Aktuelles",
+  "/einsaetze": "Einsätze",
+  "/archiv": "Archiv",
+  "/geraetehaus": "Gerätehaus",
+  "/ueber-uns": "Über uns",
+  "/termine": "Termine",
+  "/first-responder": "First Responder",
+  "/chronik": "Chronik",
+  "/historische-braende": "Historische Brände",
+  "/impressum": "Impressum",
+  "/datenschutz": "Datenschutz",
+  "/links": "Links",
+};
+function statsPathLabel(p: string): string {
+  const label = STATIC_PAGE_LABELS[p];
+  if (label) return label;
+  const m = p.match(/^\/beitrag\/(.+)$/);
+  if (m) {
+    const post = storage.getPostBySlug(m[1]);
+    if (post) return `Beitrag: ${post.title}`;
+  }
+  return p;
 }
 
 function postArea(categoryId: number): PermissionArea {
@@ -290,6 +352,38 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     res.json(getSiteSettings());
   });
 
+  // Zähl-Ping der öffentlichen Seite (cookielose, anonyme Statistik).
+  // Es werden ausschließlich Tagessummen gespeichert – keine IPs, keine Logs.
+  app.post("/api/stats/hit", (req, res) => {
+    res.status(204).end(); // Antwort sofort – Zählung darf den Besucher nie bremsen
+    try {
+      const ua = String(req.headers["user-agent"] ?? "");
+      if (!ua || BOT_UA.test(ua)) return;
+      let p = String(req.body?.path ?? "");
+      if (!p.startsWith("/") || p.length > 200) return;
+      p = p.split("?")[0];
+      if (p.startsWith("/intern")) return; // interner Bereich wird nicht gezählt
+      // Externe Herkunft (nur der Hostname, z. B. "www.google.com")
+      let refHost: string | null = null;
+      const ref = String(req.body?.referrer ?? "");
+      if (ref) {
+        try {
+          const u = new URL(ref);
+          const ownHost = String(req.headers.host ?? "").split(":")[0];
+          if (u.hostname && u.hostname !== ownHost) refHost = u.hostname.slice(0, 100);
+        } catch {
+          /* ungültiger Referrer -> ignorieren */
+        }
+      }
+      const today = statsToday();
+      const salt = statsDailySalt(today);
+      const hash = crypto.createHash("sha256").update(`${salt}|${req.ip}|${ua}`).digest("hex");
+      storage.recordPageView(today, p, refHost, hash, /Mobi/i.test(ua));
+    } catch (err) {
+      console.error("Statistik-Zählung fehlgeschlagen:", err);
+    }
+  });
+
   // Stabiler Datei-Link: /dateien/<slug> liefert immer die aktuell hinterlegte
   // Datei aus. Beim Austauschen der Datei bleibt der Link unverändert gültig.
   app.get("/dateien/:slug", (req, res) => {
@@ -322,6 +416,37 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
       einsaetzeJahr: einsaetze.filter((p) => p.publishedAt.startsWith(thisYear)).length,
       fahrzeuge: storage.listVehicles().length,
       aktive: storage.listMembers().filter((m) => m.gruppe === "aktive").length,
+    });
+  });
+
+  // ---------- ADMIN: Besucherstatistik ----------
+  app.get("/api/admin/stats", requireAuth, (req, res) => {
+    const days = Math.min(365, Math.max(1, Number(req.query.days) || 30));
+    const today = statsToday();
+    const from = new Date(`${today}T12:00:00Z`);
+    from.setUTCDate(from.getUTCDate() - (days - 1));
+    const fromDate = from.toISOString().slice(0, 10);
+
+    // Lückenlose Tagesreihe (Tage ohne Aufrufe mit 0), damit das Diagramm stimmt
+    const byDate = new Map(storage.getStatsDays(fromDate).map((d) => [d.date, d]));
+    const series: { date: string; views: number; visitors: number; mobile: number }[] = [];
+    const cursor = new Date(`${fromDate}T12:00:00Z`);
+    for (let i = 0; i < days; i++) {
+      const date = cursor.toISOString().slice(0, 10);
+      const row = byDate.get(date);
+      series.push({ date, views: row?.views ?? 0, visitors: row?.visitors ?? 0, mobile: row?.mobile ?? 0 });
+      cursor.setUTCDate(cursor.getUTCDate() + 1);
+    }
+
+    const totals = series.reduce(
+      (acc, d) => ({ views: acc.views + d.views, visitors: acc.visitors + d.visitors, mobile: acc.mobile + d.mobile }),
+      { views: 0, visitors: 0, mobile: 0 }
+    );
+    res.json({
+      days: series,
+      totals: { ...totals, today: byDate.get(today)?.views ?? 0 },
+      topPages: storage.getStatsTopPages(fromDate, 10).map((r) => ({ ...r, label: statsPathLabel(r.path) })),
+      referrers: storage.getStatsTopReferrers(fromDate, 10),
     });
   });
 

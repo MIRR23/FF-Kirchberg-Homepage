@@ -105,6 +105,32 @@ CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+-- Anonyme Besucherstatistik: nur Tagessummen, keine personenbezogenen Daten.
+-- stats_seen enthält Tages-Hashes (täglich wechselndes Salt) nur zur
+-- Dublettenerkennung und wird beim Tageswechsel geleert.
+CREATE TABLE IF NOT EXISTS stats_days (
+  date TEXT PRIMARY KEY,
+  views INTEGER NOT NULL DEFAULT 0,
+  visitors INTEGER NOT NULL DEFAULT 0,
+  mobile INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS stats_pages (
+  date TEXT NOT NULL,
+  path TEXT NOT NULL,
+  views INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (date, path)
+);
+CREATE TABLE IF NOT EXISTS stats_referrers (
+  date TEXT NOT NULL,
+  host TEXT NOT NULL,
+  views INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (date, host)
+);
+CREATE TABLE IF NOT EXISTS stats_seen (
+  date TEXT NOT NULL,
+  hash TEXT NOT NULL,
+  PRIMARY KEY (date, hash)
+);
 CREATE TABLE IF NOT EXISTS media (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   filename TEXT NOT NULL,
@@ -307,6 +333,52 @@ export class DatabaseStorage {
   }
   deleteDocument(id: number) {
     return db.delete(documents).where(eq(documents.id, id)).run();
+  }
+
+  // --- Besucherstatistik (anonyme Tagessummen) ---
+  /** Zählt einen Seitenaufruf; erhöht die Besucherzahl, wenn der Tages-Hash neu ist. */
+  recordPageView(date: string, path: string, refHost: string | null, visitorHash: string, isMobile: boolean) {
+    const isNewVisitor =
+      sqlite.prepare("INSERT OR IGNORE INTO stats_seen (date, hash) VALUES (?, ?)").run(date, visitorHash).changes > 0;
+    sqlite
+      .prepare(
+        `INSERT INTO stats_days (date, views, visitors, mobile) VALUES (?, 1, ?, ?)
+         ON CONFLICT(date) DO UPDATE SET views = views + 1, visitors = visitors + excluded.visitors, mobile = mobile + excluded.mobile`
+      )
+      .run(date, isNewVisitor ? 1 : 0, isMobile ? 1 : 0);
+    sqlite
+      .prepare(
+        `INSERT INTO stats_pages (date, path, views) VALUES (?, ?, 1)
+         ON CONFLICT(date, path) DO UPDATE SET views = views + 1`
+      )
+      .run(date, path);
+    if (refHost) {
+      sqlite
+        .prepare(
+          `INSERT INTO stats_referrers (date, host, views) VALUES (?, ?, 1)
+           ON CONFLICT(date, host) DO UPDATE SET views = views + 1`
+        )
+        .run(date, refHost);
+    }
+  }
+  /** Entfernt Tages-Hashes vergangener Tage (Dublettenerkennung wird nur für den aktuellen Tag gebraucht). */
+  purgeStatsSeenBefore(date: string) {
+    sqlite.prepare("DELETE FROM stats_seen WHERE date < ?").run(date);
+  }
+  getStatsDays(fromDate: string) {
+    return sqlite
+      .prepare("SELECT date, views, visitors, mobile FROM stats_days WHERE date >= ? ORDER BY date")
+      .all(fromDate) as { date: string; views: number; visitors: number; mobile: number }[];
+  }
+  getStatsTopPages(fromDate: string, limit: number) {
+    return sqlite
+      .prepare("SELECT path, SUM(views) AS views FROM stats_pages WHERE date >= ? GROUP BY path ORDER BY views DESC LIMIT ?")
+      .all(fromDate, limit) as { path: string; views: number }[];
+  }
+  getStatsTopReferrers(fromDate: string, limit: number) {
+    return sqlite
+      .prepare("SELECT host, SUM(views) AS views FROM stats_referrers WHERE date >= ? GROUP BY host ORDER BY views DESC LIMIT ?")
+      .all(fromDate, limit) as { host: string; views: number }[];
   }
 
   // --- Settings (Schlüssel/Wert) ---

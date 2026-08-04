@@ -1,6 +1,7 @@
-import { lazy, Suspense } from "react";
-import { Switch, Route, Router } from "wouter";
+import { lazy, Suspense, useEffect } from "react";
+import { Switch, Route, Router, useLocation } from "wouter";
 import { useHashLocation } from "wouter/use-hash-location";
+import { withBase } from "@/lib/auth";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -26,6 +27,37 @@ const AdminMedia = lazy(() => import("@/pages/admin/manage").then((m) => ({ defa
 const AdminDocuments = lazy(() => import("@/pages/admin/manage").then((m) => ({ default: m.AdminDocuments })));
 const AdminUsers = lazy(() => import("@/pages/admin/manage").then((m) => ({ default: m.AdminUsers })));
 const AdminStartseite = lazy(() => import("@/pages/admin/startseite").then((m) => ({ default: m.AdminStartseite })));
+
+// Externe Herkunft (document.referrer) nur beim ersten Aufruf mitschicken –
+// bei Navigation innerhalb der Seite ist sie nicht mehr aussagekräftig.
+let referrerSent = false;
+
+/**
+ * Meldet jeden Seitenaufruf anonym an den eigenen Server (cookielose
+ * Besucherstatistik). Angemeldete Redakteure und der interne Bereich
+ * werden nicht gezählt.
+ */
+function VisitTracker() {
+  const [location] = useLocation();
+  useEffect(() => {
+    if (location.startsWith("/intern")) return;
+    try {
+      if (localStorage.getItem("ffk_token")) return; // Redakteure nicht mitzählen
+    } catch {
+      /* localStorage gesperrt -> normal zählen */
+    }
+    const referrer = referrerSent ? "" : document.referrer;
+    referrerSent = true;
+    fetch(withBase("/api/stats/hit"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path: location, referrer }),
+    }).catch(() => {
+      /* Zählung darf das Surfen nie stören */
+    });
+  }, [location]);
+  return null;
+}
 
 function AppRouter() {
   return (
@@ -89,6 +121,7 @@ function App() {
         <AuthProvider>
           <Toaster />
           <Router hook={useHashLocation}>
+            <VisitTracker />
             <AppRouter />
           </Router>
         </AuthProvider>
