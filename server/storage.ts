@@ -9,8 +9,9 @@ import type {
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import Database from "better-sqlite3";
 import { eq, desc, asc, and, like, lt } from "drizzle-orm";
+import { DB_FILE } from "./paths";
 
-const sqlite = new Database("data.db");
+const sqlite = new Database(DB_FILE);
 sqlite.pragma("journal_mode = WAL");
 
 export const db = drizzle(sqlite);

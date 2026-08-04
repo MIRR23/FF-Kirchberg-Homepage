@@ -150,8 +150,48 @@ eigenen Server umziehen (siehe unten).
 docker compose up -d --build      # Seite danach unter http://localhost:5000
 ```
 
-Datenbank und Bilder bleiben im Volume `ffk-data` erhalten. Details siehe `Dockerfile`
-und `docker-compose.yml`.
+Alle veränderlichen Daten (Datenbank `data.db` + Ordner `uploads/`) liegen im
+Container unter **`/app/data`** (steuerbar über die Umgebungsvariable `DATA_DIR`)
+und bleiben im Volume `ffk-data` erhalten – auch bei Image-Updates. Details siehe
+`Dockerfile` und `docker-compose.yml`.
+
+## Betrieb bei Timme Hosting (ScaleServer, Container Hosting)
+
+Timme Hosting unterstützt kein Node.js im klassischen Webhosting – die Seite läuft
+dort stattdessen über das kostenlos enthaltene **Container Hosting** (ISPConfig).
+
+**Automatischer Image-Build:** Bei jedem Merge auf `main` baut GitHub Actions
+(`.github/workflows/docker-image.yml`) das fertige Docker-Image und veröffentlicht
+es als `ghcr.io/mirr23/ff-kirchberg-homepage:latest`.
+Einmalig nötig: Nach dem ersten Workflow-Lauf das Paket auf GitHub öffentlich
+stellen (Profil → Packages → `ff-kirchberg-homepage` → Package settings →
+Change visibility → Public), damit der Server es ohne Anmeldung ziehen kann.
+
+**Einrichtung im ISPConfig-Panel:**
+
+1. Container-Modul aktivieren: *System → Benutzerverwaltung → ISPConfig-Benutzer →
+   Benutzer wählen → Module → „Container" anhaken → speichern*, dann ab- und wieder
+   anmelden (bei neu ausgelieferten Servern für den Admin bereits aktiv).
+2. Neuen Container anlegen mit:
+   - **Image:** `ghcr.io/mirr23/ff-kirchberg-homepage:latest`
+   - **Interner Port:** `5000`
+   - **Umgebungsvariablen:** `NODE_ENV=production`, `PORT=5000`, `AUTO_MIGRATE=1`
+     (nach dem ersten erfolgreichen Start auf `0` stellen)
+   - **Volume:** dauerhaftes Volume auf **`/app/data`** (enthält Datenbank + Bilder)
+3. Die Website/Domain in ISPConfig als (Reverse-)Proxy auf den Container-Port 5000
+   legen; HTTPS übernimmt der vorgeschaltete nginx von Timme.
+4. Upload-Limit der Website auf ca. **35 MB** stellen (nginx `client_max_body_size`),
+   sonst scheitern große Handy-Foto-Uploads der Redakteure.
+5. Nach dem ersten Start: mit den Standard-Zugangsdaten anmelden, Passwörter ändern,
+   `AUTO_MIGRATE` auf `0` stellen und den Container neu starten.
+
+**Update auf eine neue Version:** In ISPConfig das Container-Image neu ziehen
+(latest) und den Container neu starten – Inhalte bleiben dank Volume erhalten.
+Bei Detailfragen zu den Panel-Masken hilft die Timme-Anleitung „Container Hosting"
+bzw. der Timme-Support.
+
+**Backup:** das Volume `/app/data` sichern (enthält `data.db` und `uploads/`) –
+ISPConfig bietet dafür tägliche Backups an.
 
 ## Betrieb auf dem Zielserver (Node.js)
 
