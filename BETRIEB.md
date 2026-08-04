@@ -50,6 +50,13 @@ Sicherheitsnetz: Der letzte aktive Administrator kann nicht gelöscht oder deakt
   Bild-Upload direkt im Editor. Entwürfe möglich. Beiträge erscheinen automatisch auf
   Startseite, in „Aktuelles", „Einsätze" und im Jahres-Archiv.
 - **Termine:** Datum, Uhrzeit, Ort, Art (Übung/Veranstaltung).
+- **Standort mit Karte (optional):** Beiträge/Einsätze und Termine können einen
+  Kartenstandort bekommen – per Adresssuche oder direkt per Klick auf die Karte
+  (praktisch für Einsätze abseits von Adressen, z. B. an einer Wegkreuzung).
+  Besucher sehen dann beim Eintrag eine OpenStreetMap-Karte, die aus
+  Datenschutzgründen erst nach Klick auf „Karte anzeigen" geladen wird
+  (2-Klick-Lösung), plus einen Link „In Google Maps öffnen" zur Navigation.
+  Die Datenschutzerklärung enthält den passenden Abschnitt dazu.
 - **Fahrzeuge:** Name, Typ, Bild, Beschreibung, Sortierung.
 - **Mitglieder:** Name, Funktion, Gruppe (Vorstandschaft/Aktive), optionales Foto.
   Aktuell sind nur Beispieleinträge gepflegt („Max Mustermann" usw.).

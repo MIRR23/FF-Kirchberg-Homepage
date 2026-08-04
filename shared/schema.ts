@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -63,6 +63,9 @@ export const posts = sqliteTable("posts", {
   status: text("status").notNull().default("published"), // 'published' | 'draft'
   stichwort: text("stichwort"), // z.B. "Brand B1", "THL 2" (nur Einsätze)
   ort: text("ort"), // Einsatzort
+  // Optionaler Kartenstandort (per Adresssuche oder Klick auf die Karte gesetzt)
+  lat: real("lat"),
+  lng: real("lng"),
 });
 export const insertPostSchema = createInsertSchema(posts).omit({ id: true });
 export type InsertPost = z.infer<typeof insertPostSchema>;
@@ -77,6 +80,9 @@ export const events = sqliteTable("events", {
   location: text("location").notNull().default(""),
   description: text("description").notNull().default(""),
   kind: text("kind").notNull().default("veranstaltung"), // 'veranstaltung' | 'uebung'
+  // Optionaler Kartenstandort (per Adresssuche oder Klick auf die Karte gesetzt)
+  lat: real("lat"),
+  lng: real("lng"),
 });
 export const insertEventSchema = createInsertSchema(events).omit({ id: true });
 export type InsertEvent = z.infer<typeof insertEventSchema>;

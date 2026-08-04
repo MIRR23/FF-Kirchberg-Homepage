@@ -3,6 +3,7 @@ import { CalendarDays, Clock, MapPin, UserRound } from "lucide-react";
 import type { Vehicle, Member, Page, Event } from "@shared/schema";
 import { withBase } from "@/lib/auth";
 import { cleanHtml } from "@/lib/sanitize";
+import { LocationView } from "@/components/map";
 import { usePageTitle } from "@/lib/seo";
 import { formatDate, dayOfMonth, monthShort } from "@/lib/format";
 import { PublicLayout, EmptyState, useSiteSettings } from "@/components/site";
@@ -188,6 +189,7 @@ function EventRow({ event: e }: { event: Event }) {
           <span className="flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5" />{formatDate(e.date)}</span>
         </p>
         {e.description && <p className="mt-1.5 text-sm text-muted-foreground">{e.description}</p>}
+        <LocationView lat={e.lat} lng={e.lng} label={e.location} compact />
       </div>
     </div>
   );

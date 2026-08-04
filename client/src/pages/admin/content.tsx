@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RichTextEditor } from "@/components/editor";
+import { LocationField } from "@/components/map";
 import { AdminLayout, useAdminQuery } from "./core";
 import { formatDate } from "@/lib/format";
 
@@ -57,7 +58,10 @@ export function ImageField({
 }
 
 // =============== TERMINE ===============
-const EMPTY_EVENT = { title: "", date: "", time: "", location: "", description: "", kind: "veranstaltung" };
+const EMPTY_EVENT = {
+  title: "", date: "", time: "", location: "", description: "", kind: "veranstaltung",
+  lat: null as number | null, lng: null as number | null,
+};
 
 export function AdminEvents() {
   const { token } = useAuth();
@@ -153,6 +157,11 @@ export function AdminEvents() {
                 <Label>Ort</Label>
                 <Input value={editing.location ?? ""} onChange={(e) => setEditing({ ...editing, location: e.target.value })} placeholder="z. B. Gerätehaus Kirchberg" data-testid="input-event-location" />
               </div>
+              <LocationField
+                lat={editing.lat ?? null}
+                lng={editing.lng ?? null}
+                onChange={(la, ln) => setEditing((ed) => ({ ...ed!, lat: la, lng: ln }))}
+              />
               <div className="space-y-1.5">
                 <Label>Art</Label>
                 <Select value={editing.kind ?? "veranstaltung"} onValueChange={(v) => setEditing({ ...editing, kind: v })}>
