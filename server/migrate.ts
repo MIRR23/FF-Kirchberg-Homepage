@@ -13,12 +13,13 @@ import { storage, db } from "./storage";
 import { users, categories, posts, events, vehicles, members, pages, media } from "@shared/schema";
 import { hashPassword } from "./auth";
 import { IMPRESSUM_HTML, DATENSCHUTZ_HTML, FIRST_RESPONDER_HTML } from "./content";
+import { UPLOADS_DIR } from "./paths";
 
 // Quelle: kompletter Backup-Ordner (../ffk_site) oder die im Repo enthaltenen JSON-Exporte
 const SRC = fs.existsSync(path.resolve(process.cwd(), "../ffk_site/json"))
   ? path.resolve(process.cwd(), "../ffk_site")
   : path.resolve(process.cwd(), "migration-data");
-const UPLOADS = path.resolve(process.cwd(), "uploads/wp");
+const UPLOADS = path.join(UPLOADS_DIR, "wp");
 
 function readJson(name: string): any[] {
   return JSON.parse(fs.readFileSync(path.join(SRC, "json", `${name}.json`), "utf8"));

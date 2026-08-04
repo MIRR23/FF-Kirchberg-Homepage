@@ -17,8 +17,10 @@ services:
       # gepflegte Inhalte beim Neustart nicht überschrieben werden.
       AUTO_MIGRATE: "1"
     volumes:
-      # Datenbank + hochgeladene Bilder dauerhaft sichern
-      - ffk-data:/app
+      # Datenbank + hochgeladene Bilder dauerhaft sichern.
+      # Bewusst nur /app/data statt /app: so überdeckt das Volume bei
+      # Image-Updates nicht den (neuen) Anwendungscode.
+      - ffk-data:/app/data
     restart: unless-stopped
 
 volumes:

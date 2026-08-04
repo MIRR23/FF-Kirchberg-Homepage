@@ -21,8 +21,9 @@ import {
   hashPassword, verifyPassword, newToken, safeUser, tokenCutoffIso,
   requireAuth, requirePermission, requireAdmin, hasPermission,
 } from "./auth";
+import { UPLOADS_DIR } from "./paths";
 
-const UPLOAD_DIR = path.resolve(process.cwd(), "uploads");
+const UPLOAD_DIR = UPLOADS_DIR;
 const DOC_DIR = path.join(UPLOAD_DIR, "dokumente");
 
 const upload = multer({
@@ -624,7 +625,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
   app.delete("/api/admin/media/:id", requireAuth, requirePermission("medien"), (req, res) => {
     const item = storage.getMedia(Number(req.params.id));
     if (item) {
-      const fp = path.join(process.cwd(), item.url.replace(/^\//, ""));
+      const fp = path.join(UPLOAD_DIR, item.url.replace(/^\/uploads\//, ""));
       if (fp.startsWith(UPLOAD_DIR) && fs.existsSync(fp)) fs.unlinkSync(fp);
       storage.deleteMedia(item.id);
     }

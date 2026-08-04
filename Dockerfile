@@ -1,9 +1,12 @@
 # Mehrstufiger Build der FF-Kirchberg-Homepage.
-# Für Selbst-Hosting oder als Alternative zum Render-Native-Deploy.
+# Für Selbst-Hosting (Docker/Container-Hosting, z. B. Timme Hosting ISPConfig)
+# oder als Alternative zum Render-Native-Deploy.
 #
 #   docker build -t ff-kirchberg .
 #   docker run -p 5000:5000 -v ffk-data:/app/data ff-kirchberg
 #
+# Alle veränderlichen Daten (Datenbank + Uploads) liegen unter /app/data –
+# dieses Verzeichnis als Volume mounten, damit Inhalte Updates überleben.
 # (Siehe docker-compose.yml für eine fertige Variante inkl. dauerhaftem Speicher.)
 
 # ---------- Build-Stufe ----------
@@ -20,6 +23,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=5000
 ENV AUTO_MIGRATE=1
+# Veränderliche Daten (Datenbank + Uploads) getrennt vom App-Code -> als Volume mounten
+ENV DATA_DIR=/app/data
 
 # Nur Produktionsabhängigkeiten (sharp, better-sqlite3, express … sind hier dabei)
 COPY package*.json ./
