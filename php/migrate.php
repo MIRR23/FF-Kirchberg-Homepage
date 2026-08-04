@@ -43,9 +43,13 @@ function ffk_ensure_installed(): void
 
     // Gleichzeitige Erstaufrufe dürfen die Migration nicht doppelt starten.
     $locked = ffk_row("SELECT GET_LOCK('ffk_install', 30) AS ok");
-    $haveLock = ((int) ($locked['ok'] ?? 0)) === 1;
+    if (((int) ($locked['ok'] ?? 0)) !== 1) {
+        // Ein anderer Aufruf richtet gerade ein und hat die Sperre länger als
+        // erwartet. Dann hier nichts tun, statt ein zweites Mal zu befüllen.
+        return;
+    }
     try {
-        if ($haveLock && ffk_get_setting('install_done') === '1') {
+        if (ffk_get_setting('install_done') === '1') {
             return; // ein paralleler Aufruf war schneller
         }
 
@@ -69,9 +73,7 @@ function ffk_ensure_installed(): void
 
         ffk_set_setting('install_done', '1');
     } finally {
-        if ($haveLock) {
-            ffk_exec("SELECT RELEASE_LOCK('ffk_install')");
-        }
+        ffk_exec("SELECT RELEASE_LOCK('ffk_install')");
     }
 }
 
