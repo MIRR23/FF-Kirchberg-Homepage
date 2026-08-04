@@ -1,6 +1,11 @@
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
-import { createInsertSchema } from "drizzle-zod";
-import { z } from "zod";
+/**
+ * Datenmodell der Website – gemeinsame Typen für das Frontend.
+ *
+ * Die Tabellen selbst legt das PHP-Backend an (siehe php/db.php); diese Datei
+ * beschreibt nur, wie die API die Daten ausliefert. Die Feldnamen sind
+ * camelCase, die Spalten in der Datenbank snake_case – php/storage.php bildet
+ * beides aufeinander ab.
+ */
 
 // ----- Benutzer -----
 export const PERMISSION_AREAS = [
@@ -15,166 +20,129 @@ export const PERMISSION_AREAS = [
 ] as const;
 export type PermissionArea = (typeof PERMISSION_AREAS)[number];
 
-export const users = sqliteTable("users", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(), // scrypt hash
-  displayName: text("display_name").notNull(),
-  role: text("role").notNull().default("editor"), // 'admin' | 'editor'
-  permissions: text("permissions").notNull().default("[]"), // JSON array of PermissionArea
-  active: integer("active").notNull().default(1),
-});
-
-export const insertUserSchema = createInsertSchema(users).omit({ id: true });
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
-
-export const authTokens = sqliteTable("auth_tokens", {
-  token: text("token").primaryKey(),
-  userId: integer("user_id").notNull(),
-  createdAt: text("created_at").notNull(),
-});
-export type AuthToken = typeof authTokens.$inferSelect;
+export interface User {
+  id: number;
+  username: string;
+  password: string; // Hash (password_hash), verlässt den Server nie
+  displayName: string;
+  role: string; // 'admin' | 'editor'
+  permissions: string; // JSON-Array aus PermissionArea
+  active: number; // 0 | 1
+}
 
 // ----- Kategorien -----
-export const categories = sqliteTable("categories", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  name: text("name").notNull(),
-  slug: text("slug").notNull().unique(),
-  color: text("color").notNull().default("red"), // red | amber | blue | green | gray
-  isEinsatz: integer("is_einsatz").notNull().default(0),
-});
-export const insertCategorySchema = createInsertSchema(categories).omit({ id: true });
-export type InsertCategory = z.infer<typeof insertCategorySchema>;
-export type Category = typeof categories.$inferSelect;
+export interface Category {
+  id: number;
+  name: string;
+  slug: string;
+  color: string; // red | amber | blue | green | gray
+  isEinsatz: number; // 0 | 1
+}
 
 // ----- Beiträge (Neuigkeiten + Einsätze) -----
-export const posts = sqliteTable("posts", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  title: text("title").notNull(),
-  slug: text("slug").notNull().unique(),
-  content: text("content").notNull().default(""), // HTML
-  excerpt: text("excerpt").notNull().default(""),
-  categoryId: integer("category_id").notNull(),
-  publishedAt: text("published_at").notNull(), // ISO datetime
-  featuredImage: text("featured_image"), // url path
-  images: text("images").notNull().default("[]"), // JSON array of url paths
-  authorName: text("author_name").notNull().default(""),
-  status: text("status").notNull().default("published"), // 'published' | 'draft'
-  stichwort: text("stichwort"), // z.B. "Brand B1", "THL 2" (nur Einsätze)
-  ort: text("ort"), // Einsatzort
-  // Optionaler Kartenstandort (per Adresssuche oder Klick auf die Karte gesetzt)
-  lat: real("lat"),
-  lng: real("lng"),
-});
-export const insertPostSchema = createInsertSchema(posts).omit({ id: true });
-export type InsertPost = z.infer<typeof insertPostSchema>;
-export type Post = typeof posts.$inferSelect;
+export interface Post {
+  id: number;
+  title: string;
+  slug: string;
+  content: string; // HTML
+  excerpt: string;
+  categoryId: number;
+  publishedAt: string; // ISO-Zeitstempel
+  featuredImage: string | null; // Pfad unter /uploads/
+  images: string; // JSON-Array von Pfaden
+  authorName: string;
+  status: string; // 'published' | 'draft'
+  stichwort: string | null; // z. B. "Brand B1", "THL 2" (nur Einsätze)
+  ort: string | null; // Einsatzort
+  /** Optionaler Kartenstandort (per Adresssuche oder Klick auf die Karte gesetzt) */
+  lat: number | null;
+  lng: number | null;
+}
 
 // ----- Termine / Veranstaltungen -----
-export const events = sqliteTable("events", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  title: text("title").notNull(),
-  date: text("date").notNull(), // ISO date
-  time: text("time").notNull().default(""), // z.B. "19:30"
-  location: text("location").notNull().default(""),
-  description: text("description").notNull().default(""),
-  kind: text("kind").notNull().default("veranstaltung"), // 'veranstaltung' | 'uebung'
-  // Optionaler Kartenstandort (per Adresssuche oder Klick auf die Karte gesetzt)
-  lat: real("lat"),
-  lng: real("lng"),
-});
-export const insertEventSchema = createInsertSchema(events).omit({ id: true });
-export type InsertEvent = z.infer<typeof insertEventSchema>;
-export type Event = typeof events.$inferSelect;
+export interface Event {
+  id: number;
+  title: string;
+  date: string; // ISO-Datum
+  time: string; // z. B. "19:30"
+  location: string;
+  description: string;
+  kind: string; // 'veranstaltung' | 'uebung'
+  lat: number | null;
+  lng: number | null;
+}
 
 // ----- Fahrzeuge -----
-export const vehicles = sqliteTable("vehicles", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  name: text("name").notNull(), // "LF 10/6"
-  type: text("type").notNull().default(""), // "Löschgruppenfahrzeug"
-  description: text("description").notNull().default(""), // HTML
-  image: text("image"),
-  images: text("images").notNull().default("[]"),
-  sortOrder: integer("sort_order").notNull().default(0),
-});
-export const insertVehicleSchema = createInsertSchema(vehicles).omit({ id: true });
-export type InsertVehicle = z.infer<typeof insertVehicleSchema>;
-export type Vehicle = typeof vehicles.$inferSelect;
+export interface Vehicle {
+  id: number;
+  name: string; // "LF 10/6"
+  type: string; // "Löschgruppenfahrzeug"
+  description: string; // HTML
+  image: string | null;
+  images: string;
+  sortOrder: number;
+}
 
 // ----- Mitglieder (Vorstandschaft / Aktive) -----
-export const members = sqliteTable("members", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  name: text("name").notNull(),
-  funktion: text("funktion").notNull().default(""), // z.B. "1. Kommandant"
-  gruppe: text("gruppe").notNull().default("aktive"), // 'vorstandschaft' | 'aktive'
-  image: text("image"),
-  sortOrder: integer("sort_order").notNull().default(0),
-});
-export const insertMemberSchema = createInsertSchema(members).omit({ id: true });
-export type InsertMember = z.infer<typeof insertMemberSchema>;
-export type Member = typeof members.$inferSelect;
+export interface Member {
+  id: number;
+  name: string;
+  funktion: string; // z. B. "1. Kommandant"
+  gruppe: string; // 'vorstandschaft' | 'aktive'
+  image: string | null;
+  sortOrder: number;
+}
 
 // ----- Statische Seiten (Texte) -----
-export const pages = sqliteTable("pages", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  slug: text("slug").notNull().unique(), // 'ueber-uns', 'chronik', 'impressum', ...
-  title: text("title").notNull(),
-  content: text("content").notNull().default(""), // HTML
-  updatedAt: text("updated_at").notNull().default(""),
-});
-export const insertPageSchema = createInsertSchema(pages).omit({ id: true });
-export type InsertPage = z.infer<typeof insertPageSchema>;
-export type Page = typeof pages.$inferSelect;
+export interface Page {
+  id: number;
+  slug: string; // 'ueber-uns', 'chronik', 'impressum', ...
+  title: string;
+  content: string; // HTML
+  updatedAt: string;
+}
 
 // ----- Medien -----
-export const media = sqliteTable("media", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  filename: text("filename").notNull(),
-  url: text("url").notNull(), // /uploads/...
-  title: text("title").notNull().default(""),
-  uploadedAt: text("uploaded_at").notNull().default(""),
-  uploadedBy: text("uploaded_by").notNull().default(""),
-});
-export const insertMediaSchema = createInsertSchema(media).omit({ id: true });
-export type InsertMedia = z.infer<typeof insertMediaSchema>;
-export type MediaItem = typeof media.$inferSelect;
+export interface MediaItem {
+  id: number;
+  filename: string;
+  url: string; // /uploads/...
+  title: string;
+  uploadedAt: string;
+  uploadedBy: string;
+}
 
 // ----- Dateien / Downloads (PDF, Office, …) mit stabilem Link -----
-// Der Link /dateien/<slug> bleibt beim Austauschen der Datei unverändert,
+// Der Link auf ein Dokument bleibt beim Austauschen der Datei unverändert,
 // sodass Verlinkungen (z. B. Organigramm, Übungsplan) nie angepasst werden müssen.
-export const documents = sqliteTable("documents", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  slug: text("slug").notNull().unique(), // stabiler Link-Bestandteil, wird nie geändert
-  title: text("title").notNull(),
-  filename: text("filename").notNull(), // aktuelle Datei unter uploads/dokumente/
-  originalName: text("original_name").notNull().default(""), // Dateiname beim Download
-  mimeType: text("mime_type").notNull().default("application/octet-stream"),
-  size: integer("size").notNull().default(0), // Bytes
-  updatedAt: text("updated_at").notNull().default(""),
-  updatedBy: text("updated_by").notNull().default(""),
-});
-export const insertDocumentSchema = createInsertSchema(documents).omit({ id: true });
-export type InsertDocument = z.infer<typeof insertDocumentSchema>;
-export type DocumentItem = typeof documents.$inferSelect;
+export interface DocumentItem {
+  id: number;
+  slug: string; // stabiler Link-Bestandteil, wird nie geändert
+  title: string;
+  filename: string; // aktuelle Datei unter uploads/dokumente/
+  originalName: string; // Dateiname beim Download
+  mimeType: string;
+  size: number; // Bytes
+  updatedAt: string;
+  updatedBy: string;
+}
 
-// ----- Einstellungen (Schlüssel/Wert, z. B. Hero-Bereich der Startseite) -----
-export const settings = sqliteTable("settings", {
-  key: text("key").primaryKey(),
-  value: text("value").notNull(), // JSON
-});
-export type Setting = typeof settings.$inferSelect;
-
-export const heroSettingsSchema = z.object({
-  mode: z.enum(["auto", "custom"]), // auto = Bild des neuesten Beitrags, custom = eigenes Bild
-  image: z.string().nullable(), // eigenes Bild (bei auto: Ersatzbild)
-  fit: z.enum(["cover", "contain"]), // füllend (Foto) | eingepasst (Logo/Grafik)
-  overlay: z.number().int().min(0).max(100), // Stärke der Abdunkelung
-  title: z.string().max(200), // *Wort* wird farblich hervorgehoben
-  intro: z.string().max(1000),
-  alt: z.string().max(300), // Alternativtext (Barrierefreiheit)
-});
-export type HeroSettings = z.infer<typeof heroSettingsSchema>;
+// ----- Einstellungen (Hero-Bereich der Startseite) -----
+export interface HeroSettings {
+  /** auto = Bild des neuesten Beitrags, custom = eigenes Bild */
+  mode: "auto" | "custom";
+  /** eigenes Bild (bei auto: Ersatzbild) */
+  image: string | null;
+  /** füllend (Foto) | eingepasst (Logo/Grafik) */
+  fit: "cover" | "contain";
+  /** Stärke der Abdunkelung (0–100) */
+  overlay: number;
+  /** *Wort* wird farblich hervorgehoben (max. 200 Zeichen) */
+  title: string;
+  intro: string;
+  /** Alternativtext (Barrierefreiheit) */
+  alt: string;
+}
 
 export const DEFAULT_HERO_SETTINGS: HeroSettings = {
   mode: "auto",
@@ -187,12 +155,11 @@ export const DEFAULT_HERO_SETTINGS: HeroSettings = {
   alt: "Wappen der Freiwilligen Feuerwehr Kirchberg und Logo der First Responder Kirchberg",
 };
 
-// Allgemeine Website-Einstellungen (Schlüssel "site")
-export const siteSettingsSchema = z.object({
-  // Links in Beitrags-/Seitentexten in neuem Tab öffnen
-  linksNewTab: z.boolean(),
-});
-export type SiteSettings = z.infer<typeof siteSettingsSchema>;
+// ----- Allgemeine Website-Einstellungen -----
+export interface SiteSettings {
+  /** Links in Beitrags-/Seitentexten in neuem Tab öffnen */
+  linksNewTab: boolean;
+}
 
 export const DEFAULT_SITE_SETTINGS: SiteSettings = {
   linksNewTab: true,

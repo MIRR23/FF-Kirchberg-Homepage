@@ -1,0 +1,101 @@
+name: Deployment-Paket bauen
+
+# Baut das Upload-fertige ZIP für den Webserver.
+#
+#   ffk-homepage-komplett.zip  → Erstinstallation (mit allen Bildern)
+#   ffk-homepage-update.zip    → Update (nur Programmdateien)
+#
+# Die Pakete stehen anschließend unter „Actions → Lauf auswählen → Artifacts"
+# zum Herunterladen bereit. Bei einem Git-Tag (z. B. v1.0.0) landen sie
+# zusätzlich als Release-Dateien auf der Releases-Seite.
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  pruefen:
+    name: Code prüfen
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: PHP bereitstellen
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+
+      - name: PHP-Dateien auf Syntaxfehler prüfen
+        run: find . -name "*.php" -not -path "./node_modules/*" -print0 | xargs -0 -n1 php -l
+
+      - name: Node bereitstellen
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+      - name: TypeScript prüfen
+        run: npm run check
+
+  paket:
+    name: Paket bauen
+    needs: pruefen
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Frontend bauen und Paket packen
+        run: npm run build
+
+      - name: Inhalt des Pakets anzeigen
+        run: |
+          echo "--- dist/deploy ---"
+          ls -la dist/deploy
+          echo "--- Größen ---"
+          ls -lh dist/*.zip
+
+      - name: Paket für die Erstinstallation ablegen
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffk-homepage-komplett
+          path: dist/ffk-homepage-komplett.zip
+          retention-days: 30
+          compression-level: 0 # ist bereits ein ZIP
+
+      - name: Paket für Updates ablegen
+        uses: actions/upload-artifact@v4
+        with:
+          name: ffk-homepage-update
+          path: dist/ffk-homepage-update.zip
+          retention-days: 90
+          compression-level: 0
+
+      - name: Release veröffentlichen (nur bei einem Tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/ffk-homepage-komplett.zip
+            dist/ffk-homepage-update.zip
+          body: |
+            **Installation:** `ffk-homepage-komplett.zip` herunterladen, entpacken,
+            `config.example.php` als `config.php` mit den Datenbank-Zugangsdaten füllen
+            und alles in den Web-Ordner laden. Details in `BETRIEB.md`.
+
+            **Update einer bestehenden Installation:** `ffk-homepage-update.zip`
+            verwenden – es enthält keine Bilder und keine `config.php`.
