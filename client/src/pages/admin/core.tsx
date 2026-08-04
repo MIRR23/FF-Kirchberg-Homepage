@@ -2,8 +2,12 @@ import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import {
+  ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+} from "recharts";
+import {
   Flame, LogOut, LayoutDashboard, Newspaper, CalendarDays, Truck,
   Users, FileText, Image, ShieldCheck, Menu, X, KeyRound, ExternalLink, Home, Loader2, FolderOpen,
+  BarChart3,
 } from "lucide-react";
 import type { PermissionArea, Post, Event } from "@shared/schema";
 import { useAuth, authQueryFn, authRequest } from "@/lib/auth";
@@ -11,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate } from "@/lib/format";
 
 export function useAdminQuery<T>(key: string, enabled = true) {
@@ -216,6 +221,169 @@ export function AdminLayout({ children, title }: { children: ReactNode; title: s
   );
 }
 
+// ---------- Besucherstatistik ----------
+interface StatsResponse {
+  days: { date: string; views: number; visitors: number; mobile: number }[];
+  totals: { views: number; visitors: number; mobile: number; today: number };
+  topPages: { path: string; label: string; views: number }[];
+  referrers: { host: string; views: number }[];
+}
+
+// Serienfarben: Theme-Rot + Blau (Kontrast/Farbfehlsichtigkeit gegen die dunkle
+// Kartenfläche geprüft)
+const STAT_COLOR_VIEWS = "#E84957";
+const STAT_COLOR_VISITORS = "#5C8BF0";
+
+const nf = new Intl.NumberFormat("de-DE");
+const shortDate = (d: string) => `${d.slice(8, 10)}.${d.slice(5, 7)}.`;
+
+function StatsSection() {
+  const [range, setRange] = useState(30);
+  const { data } = useAdminQuery<StatsResponse>(`/api/admin/stats?days=${range}`);
+
+  const ranges = [
+    { days: 7, label: "7 Tage" },
+    { days: 30, label: "30 Tage" },
+    { days: 90, label: "90 Tage" },
+  ];
+
+  return (
+    <div className="mt-8">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="flex items-center gap-2 font-semibold">
+          <BarChart3 className="h-4 w-4 text-primary" aria-hidden="true" /> Besucherzahlen
+        </h2>
+        <div className="flex gap-1.5">
+          {ranges.map((r) => (
+            <button
+              key={r.days}
+              onClick={() => setRange(r.days)}
+              data-testid={`button-stats-range-${r.days}`}
+              className={`rounded-full border px-3 py-1 text-xs font-semibold ${
+                range === r.days ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground"
+              }`}
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {!data ? (
+        <Skeleton className="h-72 rounded-2xl" />
+      ) : (
+        <>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="rounded-2xl border border-card-border bg-card p-5">
+              <p className="text-sm text-muted-foreground">Seitenaufrufe ({range} Tage)</p>
+              <p className="mt-1 font-display text-xl font-semibold" data-testid="text-stat-views">{nf.format(data.totals.views)}</p>
+            </div>
+            <div className="rounded-2xl border border-card-border bg-card p-5">
+              <p className="text-sm text-muted-foreground">Besucher ({range} Tage)</p>
+              <p className="mt-1 font-display text-xl font-semibold" data-testid="text-stat-visitors">{nf.format(data.totals.visitors)}</p>
+            </div>
+            <div className="rounded-2xl border border-card-border bg-card p-5">
+              <p className="text-sm text-muted-foreground">Aufrufe heute</p>
+              <p className="mt-1 font-display text-xl font-semibold" data-testid="text-stat-today">{nf.format(data.totals.today)}</p>
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-card-border bg-card p-5">
+            {data.totals.views === 0 ? (
+              <p className="py-10 text-center text-sm text-muted-foreground">
+                Noch keine Daten – die Zählung beginnt, sobald Besucher die Website aufrufen.
+              </p>
+            ) : (
+              <ResponsiveContainer width="100%" height={240}>
+                <AreaChart data={data.days} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+                  <defs>
+                    <linearGradient id="statViews" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={STAT_COLOR_VIEWS} stopOpacity={0.25} />
+                      <stop offset="100%" stopColor={STAT_COLOR_VIEWS} stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="statVisitors" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={STAT_COLOR_VISITORS} stopOpacity={0.25} />
+                      <stop offset="100%" stopColor={STAT_COLOR_VISITORS} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid stroke="hsl(var(--border))" strokeDasharray="3 3" vertical={false} />
+                  <XAxis
+                    dataKey="date" tickFormatter={shortDate} minTickGap={28}
+                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} tickLine={false} axisLine={false}
+                  />
+                  <YAxis
+                    allowDecimals={false} width={36}
+                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 11 }} tickLine={false} axisLine={false}
+                  />
+                  <Tooltip
+                    labelFormatter={(d) => formatDate(String(d))}
+                    formatter={(value: number, name: string) => [nf.format(value), name]}
+                    contentStyle={{
+                      background: "hsl(var(--card))", border: "1px solid hsl(var(--border))",
+                      borderRadius: 12, fontSize: 12, color: "hsl(var(--foreground))",
+                    }}
+                    itemStyle={{ color: "hsl(var(--foreground))" }}
+                    cursor={{ stroke: "hsl(var(--border))" }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 12 }} iconType="plainline" />
+                  <Area
+                    type="monotone" dataKey="views" name="Seitenaufrufe" stroke={STAT_COLOR_VIEWS}
+                    strokeWidth={2} fill="url(#statViews)" dot={false} activeDot={{ r: 4 }}
+                  />
+                  <Area
+                    type="monotone" dataKey="visitors" name="Besucher" stroke={STAT_COLOR_VISITORS}
+                    strokeWidth={2} fill="url(#statVisitors)" dot={false} activeDot={{ r: 4 }}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+
+          <div className="mt-4 grid gap-4 lg:grid-cols-2">
+            <div className="rounded-2xl border border-card-border bg-card p-5">
+              <h3 className="mb-3 text-sm font-semibold">Meistbesuchte Seiten ({range} Tage)</h3>
+              {!data.topPages.length ? (
+                <p className="text-sm text-muted-foreground">Noch keine Daten.</p>
+              ) : (
+                <div className="space-y-1.5">
+                  {data.topPages.map((p) => (
+                    <div key={p.path} className="flex items-center justify-between gap-3 text-sm">
+                      <span className="min-w-0 truncate">{p.label}</span>
+                      <span className="shrink-0 font-mono text-xs text-muted-foreground">{nf.format(p.views)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="rounded-2xl border border-card-border bg-card p-5">
+              <h3 className="mb-3 text-sm font-semibold">Herkunft (externe Verweise)</h3>
+              {!data.referrers.length ? (
+                <p className="text-sm text-muted-foreground">
+                  Noch keine externen Verweise – Aufrufe kamen direkt (Lesezeichen, eingetippte Adresse).
+                </p>
+              ) : (
+                <div className="space-y-1.5">
+                  {data.referrers.map((r) => (
+                    <div key={r.host} className="flex items-center justify-between gap-3 text-sm">
+                      <span className="min-w-0 truncate">{r.host}</span>
+                      <span className="shrink-0 font-mono text-xs text-muted-foreground">{nf.format(r.views)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          <p className="mt-3 text-xs text-muted-foreground">
+            Anonyme, cookielose Zählung ohne Fremdanbieter – gespeichert werden nur Tagessummen.
+            Angemeldete Redakteure und Suchmaschinen-Bots werden nicht mitgezählt.
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
 // ---------- Dashboard ----------
 export function AdminDashboard() {
   const { user, can } = useAuth();
@@ -242,6 +410,8 @@ export function AdminDashboard() {
           <p className="mt-1 font-display text-xl font-semibold">{upcoming.length}</p>
         </div>
       </div>
+
+      <StatsSection />
 
       <div className="mt-8 grid gap-6 lg:grid-cols-2">
         <div className="rounded-2xl border border-card-border bg-card p-5">

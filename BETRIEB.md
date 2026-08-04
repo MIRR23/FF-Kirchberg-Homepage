@@ -93,6 +93,20 @@ Handy-Fotos bis 30 MB) werden beim Upload automatisch fürs Web aufbereitet:
 Redakteure müssen also nichts beachten und können Fotos direkt vom Handy hochladen.
 Nur animierte GIFs bleiben unverändert.
 
+## Besucherstatistik
+
+Die Übersichtsseite des internen Bereichs zeigt eine **anonyme, cookielose
+Besucherstatistik**: Seitenaufrufe und Besucher pro Tag (Diagramm, wählbar 7/30/90
+Tage), Aufrufe heute, meistbesuchte Seiten und externe Herkunft (z. B. Google).
+
+- Komplett eingebaut, kein Fremdanbieter, kein Cookie-Banner nötig: Besucher werden
+  pro Tag über eine Prüfsumme aus IP + Browser-Kennung + täglich wechselndem
+  Zufallswert erkannt; gespeichert werden nur Tagessummen, keine IP-Adressen.
+- Suchmaschinen-Bots, der interne Bereich und **angemeldete Redakteure** (im selben
+  Browser) werden nicht mitgezählt.
+- Die Datenschutzerklärung enthält den passenden Abschnitt („Anonyme
+  Besucherstatistik").
+
 ## Migrierte Inhalte
 
 Von der alten Website (ff-kirchberg.de, WordPress) wurden vollständig übernommen:
