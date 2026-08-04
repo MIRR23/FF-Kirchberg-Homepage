@@ -1,5 +1,7 @@
 /**
- * Erzeugt das Standard-Hero-Bild der Startseite (uploads/hero-standard.png):
+ * Erzeugt das Standard-Hero-Bild der Startseite (uploads/hero-standard.png)
+ * sowie das freigestellte First-Responder-Logo (uploads/first-responder-logo.png,
+ * u. a. oben auf der Seite „First Responder" eingebunden):
  * dunkle Grafik mit dem Wappen der FF Kirchberg und dem First-Responder-Logo.
  * Die dunklen/blauen Schriftanteile des First-Responder-Logos werden für den
  * dunklen Hintergrund aufgehellt; das eingebettete Wappen bleibt unverändert.
@@ -11,6 +13,7 @@ import path from "node:path";
 
 const ROOT = process.cwd();
 const OUT = path.join(ROOT, "uploads", "hero-standard.png");
+const OUT_FR_LOGO = path.join(ROOT, "uploads", "first-responder-logo.png");
 
 const W = 1920;
 const H = 1080;
@@ -120,6 +123,10 @@ async function main() {
   const wappenMeta = await sharp(wappen).metadata();
 
   const fr = await recolorFrLogo();
+  // Freigestelltes Logo auch einzeln ablegen (helle Schrift, transparenter
+  // Hintergrund – für die Anzeige auf dunklen Seiten wie „First Responder")
+  await sharp(fr).png({ compressionLevel: 9 }).toFile(OUT_FR_LOGO);
+  console.log("geschrieben:", OUT_FR_LOGO);
   const frResized = await sharp(fr).resize({ width: 640 }).png().toBuffer();
   const frMeta = await sharp(frResized).metadata();
 

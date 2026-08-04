@@ -196,7 +196,14 @@ function EventRow({ event: e }: { event: Event }) {
 }
 
 // ---------- Statische Seiten ----------
-export function StaticPage({ slug, kicker }: { slug: string; kicker: string }) {
+export function StaticPage({
+  slug, kicker, logo,
+}: {
+  slug: string;
+  kicker: string;
+  /** Optionales Logo oberhalb des Titels (fester Seitenbestandteil, unabhängig vom editierbaren Text) */
+  logo?: { src: string; alt: string };
+}) {
   const { data: page, isLoading, error } = useQuery<Page>({ queryKey: [`/api/pages/${slug}`] });
   const { data: site } = useSiteSettings();
   usePageTitle(page?.title ?? kicker);
@@ -212,6 +219,14 @@ export function StaticPage({ slug, kicker }: { slug: string; kicker: string }) {
           <EmptyState text="Seite nicht gefunden." />
         ) : (
           <>
+            {logo && (
+              <img
+                src={withBase(logo.src)}
+                alt={logo.alt}
+                data-testid={`img-page-logo-${slug}`}
+                className="mb-8 w-full max-w-md"
+              />
+            )}
             <PageTitle kicker={kicker} title={page.title} />
             <div
               className="prose-content"

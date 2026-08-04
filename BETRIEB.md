@@ -45,7 +45,10 @@ Sicherheitsnetz: Der letzte aktive Administrator kann nicht gelöscht oder deakt
   Zusätzlich einstellbar: Darstellung (füllend für Fotos / eingepasst für Logos) und
   Stärke der Abdunkelung. Ein Wort der Überschrift zwischen zwei Sternchen (`*Minute*`)
   wird rot hervorgehoben. „Standard wiederherstellen" setzt alle Werte zurück.
-  Die Standardgrafik lässt sich mit `npx tsx script/make-hero.ts` neu erzeugen.
+  Die Standardgrafik lässt sich mit `npx tsx script/make-hero.ts` neu erzeugen;
+  das Skript erzeugt dabei auch das freigestellte First-Responder-Logo
+  (`uploads/first-responder-logo.png`), das fest oben auf der Seite
+  „First Responder" angezeigt wird.
 - **Beiträge & Einsätze:** Titel, Kategorie, Einsatzstichwort/-ort, Datum, Titelbild, Text mit
   Bild-Upload direkt im Editor. Entwürfe möglich. Beiträge erscheinen automatisch auf
   Startseite, in „Aktuelles", „Einsätze" und im Jahres-Archiv.
