@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { RichTextEditor } from "@/components/editor";
+import { LocationField } from "@/components/map";
 import { AdminLayout, useAdminQuery } from "./core";
 import { formatDate } from "@/lib/format";
 
@@ -94,6 +95,7 @@ function FilterChip({ active, onClick, children }: { active: boolean; onClick: (
 const EMPTY = {
   title: "", content: "", excerpt: "", categoryId: 0, publishedAt: "",
   featuredImage: null as string | null, status: "published", stichwort: "", ort: "",
+  lat: null as number | null, lng: null as number | null,
 };
 
 export function AdminPostEditor() {
@@ -123,6 +125,8 @@ export function AdminPostEditor() {
         status: existing.status,
         stichwort: existing.stichwort ?? "",
         ort: existing.ort ?? "",
+        lat: existing.lat ?? null,
+        lng: existing.lng ?? null,
       });
     }
   }, [existing]);
@@ -163,6 +167,8 @@ export function AdminPostEditor() {
         status,
         stichwort: selectedCat?.isEinsatz ? form.stichwort || null : null,
         ort: selectedCat?.isEinsatz ? form.ort || null : null,
+        lat: form.lat,
+        lng: form.lng,
         authorName: "",
         images: "[]",
       };
@@ -284,6 +290,12 @@ export function AdminPostEditor() {
               </div>
             </>
           )}
+
+          <LocationField
+            lat={form.lat}
+            lng={form.lng}
+            onChange={(la, ln) => setForm((f) => ({ ...f, lat: la, lng: ln }))}
+          />
 
           <div className="space-y-1.5">
             <Label htmlFor="published">Datum & Uhrzeit</Label>

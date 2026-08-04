@@ -51,7 +51,9 @@ CREATE TABLE IF NOT EXISTS posts (
   author_name TEXT NOT NULL DEFAULT '',
   status TEXT NOT NULL DEFAULT 'published',
   stichwort TEXT,
-  ort TEXT
+  ort TEXT,
+  lat REAL,
+  lng REAL
 );
 CREATE TABLE IF NOT EXISTS events (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -60,7 +62,9 @@ CREATE TABLE IF NOT EXISTS events (
   time TEXT NOT NULL DEFAULT '',
   location TEXT NOT NULL DEFAULT '',
   description TEXT NOT NULL DEFAULT '',
-  kind TEXT NOT NULL DEFAULT 'veranstaltung'
+  kind TEXT NOT NULL DEFAULT 'veranstaltung',
+  lat REAL,
+  lng REAL
 );
 CREATE TABLE IF NOT EXISTS vehicles (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -110,6 +114,17 @@ CREATE TABLE IF NOT EXISTS media (
   uploaded_by TEXT NOT NULL DEFAULT ''
 );
 `);
+
+// Schema-Nachzüge für bestehende Datenbanken (CREATE TABLE IF NOT EXISTS
+// ergänzt keine neuen Spalten in bereits vorhandenen Tabellen)
+function ensureColumn(table: string, column: string, ddl: string) {
+  const cols = sqlite.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+  if (!cols.some((c) => c.name === column)) sqlite.exec(`ALTER TABLE ${table} ADD COLUMN ${ddl}`);
+}
+ensureColumn("posts", "lat", "lat REAL");
+ensureColumn("posts", "lng", "lng REAL");
+ensureColumn("events", "lat", "lat REAL");
+ensureColumn("events", "lng", "lng REAL");
 
 export class DatabaseStorage {
   // --- Users ---

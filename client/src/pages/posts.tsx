@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, MapPin, User } from "lucide-react";
 import type { Post } from "@shared/schema";
 import { cleanHtml } from "@/lib/sanitize";
+import { LocationView } from "@/components/map";
 import { usePageTitle } from "@/lib/seo";
 import { formatDateLong, formatTime, yearOf } from "@/lib/format";
 import { PublicLayout, PostCard, EmptyState, CategoryBadge, useCategories, categoryById, useSiteSettings } from "@/components/site";
@@ -233,6 +234,7 @@ export function PostDetail() {
               data-testid="text-post-content"
               dangerouslySetInnerHTML={{ __html: cleanHtml(post.content, { linksNewTab: site?.linksNewTab }) }}
             />
+            <LocationView lat={post.lat} lng={post.lng} label={post.ort} heading="Standort" />
           </>
         )}
       </article>

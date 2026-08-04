@@ -108,20 +108,32 @@ Daten (u. a. Ihre IP-Adresse) an den jeweiligen Anbieter übertragen; dabei kön
 Daten in die USA übermittelt werden. Näheres entnehmen Sie den Datenschutzhinweisen der
 Anbieter: <a href="https://policies.google.com/privacy">Google/YouTube</a>,
 <a href="https://vimeo.com/privacy">Vimeo</a>.</p>
-<h3>7. Interner Bereich (nur für Mitglieder/Redakteure)</h3>
+<h3>7. Kartendarstellung (OpenStreetMap)</h3>
+<p>Bei Einsatzberichten und Terminen kann ein Standort auf einer Karte angezeigt werden.
+Die Karte wird aus Datenschutzgründen <strong>erst nach einem Klick</strong> auf
+„Karte anzeigen" geladen (2-Klick-Lösung). Erst dann werden Kartenausschnitte vom
+Server der OpenStreetMap Foundation (St John's Innovation Centre, Cambridge,
+Großbritannien) abgerufen und dabei Ihre IP-Adresse dorthin übertragen. Für
+Großbritannien besteht ein Angemessenheitsbeschluss der EU-Kommission.
+Rechtsgrundlage ist Ihre Einwilligung durch den Klick (Art. 6 Abs. 1 lit. a DSGVO,
+§ 25 Abs. 1 TDDDG). Näheres:
+<a href="https://osmfoundation.org/wiki/Privacy_Policy">Datenschutzerklärung der OSM Foundation</a>.
+Der zusätzlich angebotene Link „In Google Maps öffnen" führt erst nach dem Anklicken
+zu Google; dabei gelten die Datenschutzhinweise von Google.</p>
+<h3>8. Interner Bereich (nur für Mitglieder/Redakteure)</h3>
 <p>Für die Pflege der Website existiert ein zugangsgeschützter interner Bereich. Bei der
 Anmeldung wird ein Anmelde-Token im lokalen Speicher (localStorage) des Browsers
 abgelegt. Dies ist für die Bereitstellung dieser ausdrücklich gewünschten Funktion
 technisch erforderlich (§ 25 Abs. 2 Nr. 2 TDDDG) und betrifft ausschließlich angemeldete
 Redakteure, nicht die Besucher der Website.</p>
-<h3>8. Ihre Rechte</h3>
+<h3>9. Ihre Rechte</h3>
 <p>Sie haben gegenüber uns folgende Rechte hinsichtlich der Sie betreffenden
 personenbezogenen Daten: Recht auf Auskunft (Art. 15 DSGVO), Berichtigung (Art. 16
 DSGVO), Löschung (Art. 17 DSGVO), Einschränkung der Verarbeitung (Art. 18 DSGVO),
 Datenübertragbarkeit (Art. 20 DSGVO) sowie Widerspruch gegen die Verarbeitung (Art. 21
 DSGVO). Eine erteilte Einwilligung können Sie jederzeit mit Wirkung für die Zukunft
 widerrufen.</p>
-<h3>9. Beschwerderecht bei der Aufsichtsbehörde</h3>
+<h3>10. Beschwerderecht bei der Aufsichtsbehörde</h3>
 <p>Sie haben zudem das Recht, sich bei einer Datenschutz-Aufsichtsbehörde über die
 Verarbeitung Ihrer personenbezogenen Daten zu beschweren. Zuständig für uns ist das
 Bayerische Landesamt für Datenschutzaufsicht (BayLDA), Promenade 18, 91522 Ansbach,
