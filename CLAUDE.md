@@ -71,7 +71,9 @@ script/build-deploy.mjs  baut das Upload-fertige Paket
 - **Keine Interna an den Client.** Fehler kommen als deutsche Meldung,
   Details gehen per `error_log()` ins Server-Protokoll.
 - **Bilder:** Beim Upload immer optimieren (max. 1600 px, WebP, Metadaten
-  inkl. GPS entfernen). GIFs bleiben unangetastet.
+  inkl. GPS entfernen). GIFs bleiben unangetastet. Kann der Server kein WebP,
+  wird auf JPEG/PNG ausgewichen – ein fehlender Kodierer darf Uploads nie
+  komplett verhindern. Fehlermeldungen nennen Datei und Grund.
 - **Statistik bremst nie:** Der Zähl-Ping antwortet sofort mit 204 und zählt
   danach (`ffk_finish_request()`).
 - **`config.php` gehört nicht ins Repository** – nur `config.example.php`.
@@ -88,6 +90,7 @@ npm run check                 # TypeScript prüfen
 npm run build                 # Deployment-Paket + ZIPs nach dist/
 npm run build:dir             # nur dist/deploy (ohne ZIP)
 node tests/e2e.mjs            # End-to-End-Test gegen dist/deploy
+php tests/bilder.php          # Bildverarbeitung des Servers prüfen
 find . -name "*.php" -not -path "./node_modules/*" -print0 | xargs -0 -n1 php -l
 ```
 

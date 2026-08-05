@@ -135,6 +135,9 @@ Sekunden – danach ist die Seite vollständig da.
 | Bilder fehlen auf der fertigen Seite                  | Siehe **Bilder nachträglich ergänzen** weiter unten.                                                                |
 | „Der Upload ist zu groß für die Server-Einstellungen" | Schritt 4: `upload_max_filesize` und `post_max_size` erhöhen.                                                       |
 | Upload bricht ohne Meldung ab                         | `memory_limit` und `max_execution_time` erhöhen (Schritt 4).                                                        |
+| „Das Bild ist mit … Megapixeln zu groß…"              | `memory_limit` erhöhen (Schritt 4) – oder das Foto vorher verkleinern.                                              |
+| „Auf dem Server fehlt die Bildbearbeitung…"           | Beim Hoster die PHP-Erweiterung **gd** (oder **imagick**) aktivieren lassen.                                        |
+| „Der Ordner uploads/neu/ ist nicht beschreibbar."     | Schreibrechte für `uploads/` setzen (755 bzw. 775).                                                                 |
 
 Technische Fehlerdetails schreibt PHP ins Fehlerprotokoll des Servers
 (im Timme-Panel unter „Logfiles"). Besucher sehen davon nie etwas.
@@ -335,6 +338,10 @@ Handy-Fotos bis 30 MB) werden beim Upload automatisch fürs Web aufbereitet:
 - Entfernung aller Metadaten – **inklusive GPS-Standort** vom Handy (Datenschutz)
 
 Die Verarbeitung nutzt **Imagick**, falls auf dem Server vorhanden, sonst **GD**.
+Kann der Server kein WebP schreiben – manche Hoster übersetzen GD ohne WebP –,
+wird automatisch JPEG (bzw. PNG bei durchsichtigen Bildern) verwendet;
+verkleinert und von Metadaten befreit wird in jedem Fall. Schlägt ein Upload
+fehl, nennt die Meldung den Dateinamen und den konkreten Grund.
 Redakteure müssen nichts beachten und können Fotos direkt vom Handy hochladen.
 Nur animierte GIFs bleiben unverändert.
 
@@ -418,8 +425,13 @@ Prüfungen vor dem Commit:
 
 ```bash
 npm run check                                  # TypeScript
+php tests/bilder.php                           # Bildverarbeitung dieses Servers
 find . -name "*.php" -not -path "./node_modules/*" -print0 | xargs -0 -n1 php -l
 ```
+
+`php tests/bilder.php` zeigt oben, was der Server kann (`webp`, `jpeg`, `png`),
+und prüft alle Ausgabeformate durch – hilfreich, wenn Uploads auf einem
+bestimmten Server nicht funktionieren.
 
 ## Deployment-Paket bauen
 

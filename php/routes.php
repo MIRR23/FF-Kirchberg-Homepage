@@ -187,23 +187,6 @@ function ffk_guard_post_size(): void
     }
 }
 
-/** Wandelt PHP-Größenangaben wie "32M" in Bytes um. */
-function ffk_ini_bytes(string $value): int
-{
-    $value = trim($value);
-    if ($value === '') {
-        return 0;
-    }
-    $unit = strtolower($value[strlen($value) - 1]);
-    $num = (int) $value;
-    return match ($unit) {
-        'g' => $num * 1024 * 1024 * 1024,
-        'm' => $num * 1024 * 1024,
-        'k' => $num * 1024,
-        default => $num,
-    };
-}
-
 /** Deutsche Meldung für einen PHP-Upload-Fehlercode. */
 function ffk_upload_error_message(int $code): string
 {
@@ -742,7 +725,13 @@ function ffk_handle_media_upload(array $user): never
     $dir = FFK_UPLOAD_DIR . '/neu';
     ffk_mkdir($dir);
 
+    if (!is_dir($dir) || !is_writable($dir)) {
+        ffk_fail(500, 'Der Ordner uploads/neu/ ist nicht beschreibbar. Bitte die Schreibrechte '
+            . 'für uploads/ auf dem Server prüfen (meist 755 oder 775).');
+    }
+
     $created = [];
+    $gruende = [];
     foreach ($files as $f) {
         if ($f['error'] !== UPLOAD_ERR_OK) {
             if ($f['error'] === UPLOAD_ERR_NO_FILE) {
@@ -756,19 +745,24 @@ function ffk_handle_media_upload(array $user): never
         // Nur echte Bilder annehmen (Typ aus dem Dateiinhalt, nicht aus dem Browser)
         $info = @getimagesize($f['tmp_name']);
         if ($info === false || !in_array((string) ($info['mime'] ?? ''), FFK_IMAGE_MIME_TYPES, true)) {
+            $gruende[] = sprintf('„%s“: keine Bilddatei (erlaubt sind JPG, PNG, GIF, WebP).', $f['name']);
             continue;
         }
 
         $filename = ffk_unique_filename($dir, $f['name']);
         $dest = $dir . '/' . $filename;
         if (!ffk_move_uploaded($f['tmp_name'], $dest)) {
+            $gruende[] = sprintf('„%s“: konnte nicht gespeichert werden (Schreibrechte in uploads/).', $f['name']);
             continue;
         }
 
-        // Fürs Web optimieren: verkleinern, WebP, Metadaten/GPS entfernen
-        $optimized = ffk_optimize_image($dest, (string) $info['mime']);
-        if ($optimized === null) {
-            @unlink($dest); // ungültige Datei löschen statt behalten
+        // Fürs Web optimieren: verkleinern, Metadaten/GPS entfernen
+        try {
+            $optimized = ffk_optimize_image($dest, (string) $info['mime']);
+        } catch (FfkImageException $e) {
+            @unlink($dest); // unbrauchbare Datei nicht liegen lassen
+            error_log('[FFK] Bild-Upload fehlgeschlagen: ' . $e->getMessage());
+            $gruende[] = sprintf('„%s“: %s', $f['name'], $e->getMessage());
             continue;
         }
         $filename = basename($optimized);
@@ -783,7 +777,10 @@ function ffk_handle_media_upload(array $user): never
     }
 
     if ($created === []) {
-        ffk_fail(400, 'Die Datei(en) konnten nicht als Bild verarbeitet werden.');
+        // Die genaue Ursache nennen – „ging nicht" hilft beim Beheben nicht weiter.
+        ffk_fail(400, $gruende === []
+            ? 'Es wurde keine Datei empfangen.'
+            : implode(' ', array_slice($gruende, 0, 3)));
     }
     ffk_json($created);
 }
