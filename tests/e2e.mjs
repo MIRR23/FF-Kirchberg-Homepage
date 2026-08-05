@@ -797,7 +797,29 @@ try {
   check("Fahrzeuge unverändert", nachReimport.fahrzeuge === vorReimport.fahrzeuge);
 
   // =======================================================================
-  group("18. Keine Fehler im Browser");
+  group("18. Verständliche Meldungen beim Bild-Upload");
+  // =======================================================================
+  // Eine Textdatei mit Bild-Endung muss abgelehnt werden – mit einer Meldung,
+  // die den Dateinamen und den Grund nennt, statt nur „ging nicht".
+  const keinBild = path.join(TMP, "kein-bild.jpg");
+  writeFileSync(keinBild, "das ist kein Bild");
+  const fd = new FormData();
+  fd.append("files[]", new Blob([readFileSync(keinBild)]), "kein-bild.jpg");
+  const abgelehnt = await fetch(`${BASE}/api.php?r=${encodeURIComponent("/admin/media")}`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token0}` },
+    body: fd,
+  });
+  const meldung = (await abgelehnt.json()).message ?? "";
+  check("Textdatei mit .jpg wird abgelehnt", abgelehnt.status === 400, `${abgelehnt.status}`);
+  check("Meldung nennt den Dateinamen", meldung.includes("kein-bild.jpg"), meldung.slice(0, 90));
+  check("Meldung nennt den Grund", /keine Bilddatei/i.test(meldung), meldung.slice(0, 90));
+
+  // Ein echtes Bild geht danach unverändert durch
+  check("Mediathek weiterhin abrufbar", (await api("/admin/media", { token: token0 })).status === 200);
+
+  // =======================================================================
+  group("19. Keine Fehler im Browser");
   // =======================================================================
   // Externe Ressourcen (Schriftarten, Kartenkacheln) sind in der Testumgebung
   // ohne Internetzugang nicht erreichbar – das sind keine Fehler der Anwendung.

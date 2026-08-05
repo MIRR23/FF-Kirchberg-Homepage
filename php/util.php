@@ -163,6 +163,23 @@ function ffk_to_float_or_null(mixed $v): ?float
     return (float) $v;
 }
 
+/** Wandelt PHP-Größenangaben wie "32M" in Bytes um. */
+function ffk_ini_bytes(string $value): int
+{
+    $value = trim($value);
+    if ($value === '') {
+        return 0;
+    }
+    $unit = strtolower($value[strlen($value) - 1]);
+    $num = (int) $value;
+    return match ($unit) {
+        'g' => $num * 1024 * 1024 * 1024,
+        'm' => $num * 1024 * 1024,
+        'k' => $num * 1024,
+        default => $num,
+    };
+}
+
 /** Legt ein Verzeichnis an, falls es fehlt. */
 function ffk_mkdir(string $dir): void
 {
