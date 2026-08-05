@@ -3,6 +3,7 @@ import { CalendarDays, Clock, MapPin, UserRound } from "lucide-react";
 import type { Vehicle, Member, Page, Event } from "@shared/schema";
 import { withBase } from "@/lib/auth";
 import { cleanHtml } from "@/lib/sanitize";
+import { ImageGallery } from "@/components/gallery";
 import { LocationView } from "@/components/map";
 import { usePageTitle } from "@/lib/seo";
 import { formatDate, dayOfMonth, monthShort } from "@/lib/format";
@@ -60,6 +61,12 @@ export function Geraetehaus() {
                   <div
                     className="prose-content mt-4 text-sm text-foreground/90"
                     dangerouslySetInnerHTML={{ __html: cleanHtml(v.description, { linksNewTab: site?.linksNewTab }) }}
+                  />
+                  <ImageGallery
+                    images={v.images}
+                    title={v.name}
+                    heading=""
+                    testId={`vehicle-gallery-${v.id}`}
                   />
                 </div>
               </div>

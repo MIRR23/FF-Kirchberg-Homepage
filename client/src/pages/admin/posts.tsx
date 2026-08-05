@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { RichTextEditor } from "@/components/editor";
 import { LocationField } from "@/components/map";
 import { MediaPickerButton } from "@/components/media-picker";
+import { GalleryField, parseImages } from "@/components/gallery";
 import { AdminLayout, useAdminQuery } from "./core";
 import { formatDate } from "@/lib/format";
 
@@ -101,17 +102,6 @@ const EMPTY = {
   images: [] as string[],
 };
 
-/** Die Galerie steht in der Datenbank als JSON-Liste. */
-function parseImages(raw: string | null | undefined): string[] {
-  if (!raw) return [];
-  try {
-    const list = JSON.parse(raw);
-    return Array.isArray(list) ? list.filter((x): x is string => typeof x === "string") : [];
-  } catch {
-    return [];
-  }
-}
-
 export function AdminPostEditor() {
   const [, params] = useRoute("/intern/beitraege/:id");
   const isNew = params?.id === "neu";
@@ -126,7 +116,6 @@ export function AdminPostEditor() {
   const [form, setForm] = useState({ ...EMPTY });
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [uploadingGallery, setUploadingGallery] = useState(false);
 
   useEffect(() => {
     if (existing) {
@@ -227,36 +216,6 @@ export function AdminPostEditor() {
       setUploading(false);
     }
   };
-
-  // ---------- Galerie ----------
-  /** Nimmt Bilder in die Galerie auf; bereits enthaltene werden übersprungen. */
-  const addImages = (urls: string[]) =>
-    setForm((f) => ({ ...f, images: [...f.images, ...urls.filter((u) => !f.images.includes(u))] }));
-
-  const uploadGallery = async (files: FileList | null) => {
-    if (!files?.length) return;
-    setUploadingGallery(true);
-    try {
-      addImages((await uploadFiles(token, files)).map((m) => m.url));
-    } catch (err: any) {
-      toast({ title: "Upload fehlgeschlagen", description: err.message, variant: "destructive" });
-    } finally {
-      setUploadingGallery(false);
-    }
-  };
-
-  const removeImage = (url: string) =>
-    setForm((f) => ({ ...f, images: f.images.filter((u) => u !== url) }));
-
-  /** Verschiebt ein Bild um eine Position nach vorn oder hinten. */
-  const moveImage = (index: number, richtung: -1 | 1) =>
-    setForm((f) => {
-      const ziel = index + richtung;
-      if (ziel < 0 || ziel >= f.images.length) return f;
-      const images = [...f.images];
-      [images[index], images[ziel]] = [images[ziel], images[index]];
-      return { ...f, images };
-    });
 
   if (!isNew && isLoading) {
     return (
@@ -383,62 +342,10 @@ export function AdminPostEditor() {
           </div>
 
           {/* Weitere Bilder: erscheinen als Galerie unter dem Beitragstext */}
-          <div className="space-y-1.5">
-            <Label>Weitere Bilder</Label>
-            <p className="text-xs text-muted-foreground">
-              Erscheinen als Bilderreihe unter dem Text. Reihenfolge mit den Pfeilen ändern.
-            </p>
-            {form.images.length > 0 && (
-              <div className="grid grid-cols-3 gap-2" data-testid="gallery-editor">
-                {form.images.map((url, i) => (
-                  <div key={url} className="group relative overflow-hidden rounded-lg border border-border">
-                    <img src={withBase(url)} alt="" className="aspect-square w-full object-cover" />
-                    <button
-                      type="button"
-                      onClick={() => removeImage(url)}
-                      title="Bild entfernen"
-                      data-testid={`button-remove-gallery-${i}`}
-                      className="absolute right-1 top-1 rounded-full bg-black/70 p-1 text-white"
-                    >
-                      <X className="h-3.5 w-3.5" />
-                    </button>
-                    <div className="absolute inset-x-0 bottom-0 flex justify-between bg-black/60 px-1 py-0.5">
-                      <button
-                        type="button" onClick={() => moveImage(i, -1)} disabled={i === 0}
-                        title="Nach vorn" data-testid={`button-gallery-up-${i}`}
-                        className="p-0.5 text-white/80 hover:text-white disabled:opacity-30"
-                      >
-                        <ArrowUp className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        type="button" onClick={() => moveImage(i, 1)} disabled={i === form.images.length - 1}
-                        title="Nach hinten" data-testid={`button-gallery-down-${i}`}
-                        className="p-0.5 text-white/80 hover:text-white disabled:opacity-30"
-                      >
-                        <ArrowDown className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            <div className="flex flex-wrap gap-2">
-              <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-border px-3 py-2 text-sm hover:border-input">
-                {uploadingGallery ? <Loader2 className="h-4 w-4 animate-spin" /> : <ImagePlus className="h-4 w-4" />}
-                Hochladen
-                <input
-                  type="file" accept="image/*" multiple className="hidden" data-testid="input-gallery-upload"
-                  onChange={(e) => { uploadGallery(e.target.files); e.target.value = ""; }}
-                />
-              </label>
-              <MediaPickerButton
-                multiple
-                alreadyUsed={form.images}
-                testId="button-gallery-from-library"
-                onSelect={addImages}
-              />
-            </div>
-          </div>
+          <GalleryField
+            value={form.images}
+            onChange={(images) => setForm((f) => ({ ...f, images }))}
+          />
 
           <div className="flex flex-col gap-2 border-t border-border pt-5">
             <Button onClick={() => save("published")} disabled={busy} data-testid="button-save-publish">

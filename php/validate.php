@@ -283,7 +283,7 @@ function ffk_validate_vehicle(array $b, bool $partial): FfkValidation
         ffk_field_string($b, 'type', $out, ['max' => 255, 'default' => $partial ? null : '']),
         ffk_field_string($b, 'description', $out, ['default' => $partial ? null : '']),
         ffk_field_string($b, 'image', $out, ['nullable' => true, 'max' => 500]),
-        ffk_field_string($b, 'images', $out, ['default' => $partial ? null : '[]']),
+        ffk_field_image_list($b, 'images', $out, ['default' => $partial ? null : '[]']),
         ffk_field_int($b, 'sortOrder', $out, ['default' => $partial ? null : 0]),
     ];
     if ($partial) {
