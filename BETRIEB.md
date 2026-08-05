@@ -165,14 +165,18 @@ bereits betroffene Installation:
    'auto_migrate' => 'neu',
    ```
 
-3. **Website einmal aufrufen.** Beiträge, Seiten, Fahrzeuge und Mediathek
-   werden frisch aus `migration-data/` aufgebaut – diesmal mit allen Bildern.
+3. **Website einmal aufrufen.** Alles, was in der Datenbank fehlt, wird
+   nachgetragen – vor allem die fehlenden Einträge in der Mediathek.
 
-Dabei bleiben erhalten: **Benutzerkonten mit geänderten Passwörtern**, die
-unter „Dateien" hochgeladenen Downloads und die Besucherstatistik.
-Überschrieben werden die migrierten Inhalte – **selbst angelegte Beiträge,
-Termine und Mitglieder gehen dabei verloren.** Reparieren Sie also am besten,
-bevor Sie eigene Inhalte pflegen.
+Das Einlesen ist **rein ergänzend**: Es legt ausschließlich Einträge an, die
+noch fehlen. Gepflegte Mitglieder, Fahrzeuge, Seitentexte, Termine, Benutzer
+und selbst verfasste Beiträge bleiben unangetastet – es geht dabei nichts
+verloren.
+
+Beiträge, deren Bilder bereits beim ersten Einlesen verloren gingen, lassen
+sich damit allerdings nicht mehr reparieren: Für diese fügen Sie die Bilder
+im internen Bereich unter „Weitere Bilder" von Hand hinzu (siehe
+**Mehrere Bilder je Beitrag** weiter unten).
 
 Der Wert `'neu'` darf anschließend in der `config.php` stehen bleiben; die
 Erstbefüllung läuft nur ein einziges Mal. Soll sie später noch einmal laufen,
@@ -273,6 +277,18 @@ für die betreffende IP-Adresse vorübergehend.
 - **Beiträge & Einsätze:** Titel, Kategorie, Einsatzstichwort/-ort, Datum, Titelbild, Text mit
   Bild-Upload direkt im Editor. Entwürfe möglich. Beiträge erscheinen automatisch auf
   Startseite, in „Aktuelles", „Einsätze" und im Jahres-Archiv.
+- **Mehrere Bilder je Beitrag:** Unter dem Titelbild gibt es den Bereich
+  **Weitere Bilder**. Dort lassen sich beliebig viele Fotos hinzufügen – neu
+  hochladen oder mit **Aus Mediathek** aus den bereits vorhandenen Bildern
+  auswählen (auch aus den rund 460 von der alten Website übernommenen).
+  Die Reihenfolge ändern die Pfeile auf den Vorschaubildern. Besucher sehen
+  die Bilder als Reihe unter dem Text; ein Klick zeigt sie groß, geblättert
+  wird mit den Pfeilen oder der Tastatur.
+- **Bereits hochgeladene Bilder verknüpfen:** Der Knopf **Aus Mediathek**
+  steht überall dort, wo ein Bild ausgewählt wird – beim Titelbild, in der
+  Galerie sowie bei Fahrzeugen, Mitgliedern und dem Startseiten-Bild. Ein
+  Suchfeld hilft beim Finden; neue Bilder lassen sich im selben Fenster
+  hochladen.
 - **Termine:** Datum, Uhrzeit, Ort, Art (Übung/Veranstaltung).
 - **Standort mit Karte (optional):** Beiträge/Einsätze und Termine können einen
   Kartenstandort bekommen – per Adresssuche oder direkt per Klick auf die Karte
@@ -283,7 +299,11 @@ für die betreffende IP-Adresse vorübergehend.
   Die Datenschutzerklärung enthält den passenden Abschnitt dazu.
 - **Fahrzeuge:** Name, Typ, Bild, Beschreibung, Sortierung.
 - **Mitglieder:** Name, Funktion, Gruppe (Vorstandschaft/Aktive), optionales Foto.
-  Aktuell sind nur Beispieleinträge gepflegt („Max Mustermann" usw.).
+  Die **Reihenfolge** wird je Gruppe festgelegt: am Computer den Eintrag am
+  Griff links anfassen und an die gewünschte Stelle ziehen, auf Handy und
+  Tablet die Pfeile hoch/runter benutzen. Genau in dieser Reihenfolge
+  erscheinen die Personen auf der Seite „Über uns". Neue Einträge landen
+  zunächst am Ende ihrer Gruppe.
 - **Seiten & Texte:** Über uns, Chronik, Historische Brände, First Responder,
   Impressum, Datenschutz, Links. Dort findet sich auch die Einstellung
   **Link-Verhalten**: Links in Beiträgen und Seiten öffnen standardmäßig in einem

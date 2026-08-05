@@ -139,6 +139,60 @@ function ffk_field_enum(array $b, string $key, array $allowed, array &$out, arra
     return null;
 }
 
+/** Höchstzahl der Bilder in einer Beitrags-Galerie. */
+const FFK_MAX_GALLERY_IMAGES = 60;
+
+/**
+ * Holt eine Bilderliste (Galerie). Erlaubt sind sowohl eine JSON-Zeichenkette
+ * als auch ein Array; gespeichert wird immer JSON. Zugelassen sind nur Pfade
+ * unterhalb von /uploads/ – damit lassen sich keine fremden Adressen einbauen.
+ */
+function ffk_field_image_list(array $b, string $key, array &$out, array $opts = []): ?string
+{
+    if (!array_key_exists($key, $b)) {
+        if (array_key_exists('default', $opts)) {
+            $out[$key] = $opts['default'];
+        }
+        return null;
+    }
+    $v = $b[$key];
+    if ($v === null || $v === '') {
+        $out[$key] = '[]';
+        return null;
+    }
+    if (is_string($v)) {
+        $decoded = json_decode($v, true);
+        if (!is_array($decoded)) {
+            return "Das Feld „{$key}“ enthält keine gültige Bilderliste.";
+        }
+        $v = $decoded;
+    }
+    if (!is_array($v)) {
+        return "Das Feld „{$key}“ enthält keine gültige Bilderliste.";
+    }
+    if (count($v) > FFK_MAX_GALLERY_IMAGES) {
+        return 'Es sind höchstens ' . FFK_MAX_GALLERY_IMAGES . ' Bilder pro Beitrag möglich.';
+    }
+
+    $paths = [];
+    foreach ($v as $item) {
+        if (!is_string($item) || $item === '') {
+            return "Das Feld „{$key}“ enthält einen ungültigen Eintrag.";
+        }
+        if (!str_starts_with($item, '/uploads/') || str_contains($item, '..')) {
+            return 'Bilder müssen aus der Mediathek stammen.';
+        }
+        if (mb_strlen($item, 'UTF-8') > 500) {
+            return 'Eine Bildadresse ist zu lang.';
+        }
+        if (!in_array($item, $paths, true)) {
+            $paths[] = $item; // Dubletten stillschweigend zusammenfassen
+        }
+    }
+    $out[$key] = json_encode($paths, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    return null;
+}
+
 /** Holt ein Ja/Nein-Feld. */
 function ffk_field_bool(array $b, string $key, array &$out): ?string
 {
@@ -180,7 +234,7 @@ function ffk_validate_post(array $b, bool $partial): FfkValidation
         ffk_field_int($b, 'categoryId', $out, ['required' => $req, 'min' => 1]),
         ffk_field_string($b, 'publishedAt', $out, ['required' => $req, 'max' => 40]),
         ffk_field_string($b, 'featuredImage', $out, ['nullable' => true, 'max' => 500]),
-        ffk_field_string($b, 'images', $out, ['default' => $partial ? null : '[]']),
+        ffk_field_image_list($b, 'images', $out, ['default' => $partial ? null : '[]']),
         ffk_field_string($b, 'authorName', $out, ['max' => 255, 'default' => $partial ? null : '']),
         ffk_field_enum($b, 'status', ['published', 'draft'], $out),
         ffk_field_string($b, 'stichwort', $out, ['nullable' => true, 'max' => 255]),

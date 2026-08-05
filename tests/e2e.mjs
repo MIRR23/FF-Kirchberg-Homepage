@@ -588,7 +588,169 @@ try {
   check("Interner Bereich verlangt wieder eine Anmeldung", (await page.locator('[data-testid="input-username"]').count()) > 0);
 
   // =======================================================================
-  group("14. Keine Fehler im Browser");
+  group("14. Mehrere Bilder je Beitrag (Galerie)");
+  // =======================================================================
+  // Der Test hat sich in Gruppe 13 abgemeldet – für den Editor neu anmelden.
+  await gotoPageRaw(page, "/intern");
+  await page.fill('[data-testid="input-username"]', ADMIN.username);
+  await page.fill('[data-testid="input-password"]', ADMIN.password);
+  await page.click('[data-testid="button-login"]');
+  await page.waitForSelector('[data-testid="text-current-user"]', { timeout: 15000 });
+
+  const mediathek = (await api("/admin/media", { token: token0 })).body;
+  const bildA = mediathek[0].url;
+  const bildB = mediathek[1].url;
+
+  await gotoPageRaw(page, `/intern/beitraege/${created.id}`);
+  await page.waitForSelector('[data-testid="input-post-title"]', { timeout: 15000 });
+
+  // Bereits hochgeladene Bilder über die Mediathek verknüpfen
+  await page.click('[data-testid="button-gallery-from-library"]');
+  await page.waitForSelector('[data-testid="input-media-search"]', { timeout: 15000 });
+  check("Mediathek-Auswahl öffnet sich", await page.locator('[data-testid="input-media-search"]').isVisible());
+  const kacheln = await page.locator('[data-testid^="button-pick-media-"]').count();
+  check("Mediathek zeigt vorhandene Bilder", kacheln > 10, `${kacheln} Kacheln`);
+
+  await page.locator('[data-testid^="button-pick-media-"]').nth(0).click();
+  await page.locator('[data-testid^="button-pick-media-"]').nth(1).click();
+  await page.click('[data-testid="button-media-confirm"]');
+  await page.waitForTimeout(500);
+  const inGalerie = await page.locator('[data-testid="gallery-editor"] img').count();
+  check("Zwei Bilder in die Galerie übernommen", inGalerie === 2, `${inGalerie}`);
+
+  // Zusätzlich ein neues Bild hochladen
+  await page.setInputFiles('[data-testid="input-gallery-upload"]', photo.file);
+  const dreiBilder = await waitFor(
+    async () => (await page.locator('[data-testid="gallery-editor"] img').count()) === 3,
+    { timeout: 30000 },
+  );
+  check("Hochgeladenes Bild kommt in die Galerie", dreiBilder);
+
+  await page.click('[data-testid="button-save-publish"]');
+  await page.waitForTimeout(1500);
+
+  const mitGalerie = (await api(`/posts/slug/${created.slug}`)).body;
+  let galerie = [];
+  try { galerie = JSON.parse(mitGalerie.images); } catch { galerie = []; }
+  check("Galerie wurde gespeichert", galerie.length === 3, JSON.stringify(galerie).slice(0, 90));
+  check("Galerie enthält die gewählten Bestandsbilder", galerie.includes(bildA) && galerie.includes(bildB));
+
+  // Öffentliche Anzeige samt Vergrößern
+  await gotoPage(page, `/beitrag/${created.slug}`, { expect: "Bilder" });
+  const kachelnOeffentlich = await page.locator('[data-testid^="button-gallery-image-"]').count();
+  check("Galerie erscheint auf der Beitragsseite", kachelnOeffentlich === 3, `${kachelnOeffentlich}`);
+  await page.click('[data-testid="button-gallery-image-0"]');
+  await page.waitForSelector('[data-testid="gallery-lightbox"]', { timeout: 10000 });
+  check("Klick vergrößert das Bild", await page.locator('[data-testid="gallery-lightbox"]').isVisible());
+  await page.click('[data-testid="button-gallery-next"]');
+  await page.waitForTimeout(300);
+  check("Weiterblättern funktioniert", await page.locator('[data-testid="gallery-lightbox"]').isVisible());
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(400);
+  check("Escape schließt die Großansicht", (await page.locator('[data-testid="gallery-lightbox"]').count()) === 0);
+
+  // Fremde Adressen werden abgewiesen
+  const fremd = await fetch(`${BASE}/api.php?r=${encodeURIComponent(`/admin/posts/${created.id}`)}&_method=PATCH`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token0}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ images: ["https://fremde-seite.example/bild.jpg"] }),
+  });
+  check("Fremde Bildadressen werden abgelehnt", fremd.status === 400);
+
+  // =======================================================================
+  group("15. Reihenfolge der Mitglieder");
+  // =======================================================================
+  for (const name of ["Anton Erster", "Berta Zweite", "Cäsar Dritter"]) {
+    await api("/admin/members", {
+      method: "POST", token: token0,
+      json: { name, funktion: "Test", gruppe: "vorstandschaft" },
+    });
+  }
+  const vorher = (await api("/members")).body.filter((m) => m.funktion === "Test").map((m) => m.name);
+  check("Testmitglieder angelegt", vorher.length === 3, vorher.join(", "));
+
+  await gotoPageRaw(page, "/intern/mitglieder");
+  await page.waitForSelector('[data-testid^="row-admin-member-"]', { timeout: 15000 });
+
+  // Letzten Eintrag der Vorstandschaft zweimal nach oben schieben
+  const idListe = (await api("/members")).body.filter((m) => m.gruppe === "vorstandschaft").map((m) => m.id);
+  const letzteId = idListe[idListe.length - 1];
+  await page.click(`[data-testid="button-member-up-${letzteId}"]`);
+  await page.waitForTimeout(900);
+  await page.click(`[data-testid="button-member-up-${letzteId}"]`);
+  await page.waitForTimeout(900);
+
+  const nachher = (await api("/members")).body.filter((m) => m.gruppe === "vorstandschaft").map((m) => m.id);
+  check(
+    "Pfeiltaste verschiebt den Eintrag nach oben",
+    nachher.indexOf(letzteId) === idListe.length - 3,
+    `Position ${nachher.indexOf(letzteId)} statt ${idListe.length - 1}`,
+  );
+  const sortierungen = (await api("/members")).body
+    .filter((m) => m.gruppe === "vorstandschaft")
+    .map((m) => m.sortOrder);
+  check(
+    "Sortiernummern sind lückenlos aufsteigend",
+    sortierungen.every((v, i) => v === i + 1),
+    sortierungen.join(","),
+  );
+
+  // Ziehen mit der Maus (Desktop-Weg)
+  const vorDrag = (await api("/members")).body.filter((m) => m.gruppe === "vorstandschaft").map((m) => m.id);
+  await gotoPageRaw(page, "/intern/mitglieder");
+  await page.waitForSelector(`[data-testid="row-admin-member-${vorDrag[0]}"]`, { timeout: 15000 });
+  await page
+    .locator(`[data-testid="row-admin-member-${vorDrag[0]}"]`)
+    .dragTo(page.locator(`[data-testid="row-admin-member-${vorDrag[vorDrag.length - 1]}"]`));
+  await page.waitForTimeout(1200);
+  const nachDrag = (await api("/members")).body.filter((m) => m.gruppe === "vorstandschaft").map((m) => m.id);
+  check(
+    "Ziehen ändert die Reihenfolge",
+    nachDrag[0] !== vorDrag[0] && nachDrag.length === vorDrag.length,
+    `${vorDrag.join(",")} -> ${nachDrag.join(",")}`,
+  );
+
+  // Öffentliche Seite zeigt dieselbe Reihenfolge
+  const reihenfolgeApi = (await api("/members")).body
+    .filter((m) => m.gruppe === "vorstandschaft").map((m) => m.name);
+  const ueberUns = await gotoPage(page, "/ueber-uns", { expect: reihenfolgeApi[0] });
+  const positionen = reihenfolgeApi.map((n) => ueberUns.indexOf(n));
+  check(
+    "Über uns zeigt die gepflegte Reihenfolge",
+    positionen.every((v, i) => v >= 0 && (i === 0 || v > positionen[i - 1])),
+    positionen.join(","),
+  );
+
+  // =======================================================================
+  group("16. Erneutes Einlesen überschreibt nichts");
+  // =======================================================================
+  const vorReimport = {
+    mitglieder: (await api("/members")).body.length,
+    beitraege: (await api("/posts")).body.length,
+    seite: (await api("/pages/impressum")).body.title,
+    termine: (await api("/events")).body.length,
+    fahrzeuge: (await api("/vehicles")).body.map((v) => v.name).join(","),
+  };
+  // Erzwungenes Neu-Einlesen wie beim Reparaturweg in der config.php
+  await api("/admin/settings/site", { method: "POST", token: token0, json: { linksNewTab: true } });
+  const reimport = await fetch(`${BASE}/api.php?r=${encodeURIComponent("/posts")}`);
+  check("Seite bleibt erreichbar", reimport.status === 200);
+
+  const nachReimport = {
+    mitglieder: (await api("/members")).body.length,
+    beitraege: (await api("/posts")).body.length,
+    seite: (await api("/pages/impressum")).body.title,
+    termine: (await api("/events")).body.length,
+    fahrzeuge: (await api("/vehicles")).body.map((v) => v.name).join(","),
+  };
+  check("Mitglieder unverändert", nachReimport.mitglieder === vorReimport.mitglieder);
+  check("Beiträge unverändert", nachReimport.beitraege === vorReimport.beitraege);
+  check("Seitentitel unverändert", nachReimport.seite === vorReimport.seite);
+  check("Termine unverändert", nachReimport.termine === vorReimport.termine);
+  check("Fahrzeuge unverändert", nachReimport.fahrzeuge === vorReimport.fahrzeuge);
+
+  // =======================================================================
+  group("17. Keine Fehler im Browser");
   // =======================================================================
   // Externe Ressourcen (Schriftarten, Kartenkacheln) sind in der Testumgebung
   // ohne Internetzugang nicht erreichbar – das sind keine Fehler der Anwendung.

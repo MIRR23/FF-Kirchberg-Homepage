@@ -462,6 +462,30 @@ function ffk_handle_request(string $method, string $path): void
         }
     }
 
+    // ---------- ADMIN: Reihenfolge von Mitgliedern und Fahrzeugen ----------
+    // Muss vor der allgemeinen CRUD-Behandlung stehen, sonst würde "reorder"
+    // als Datensatz-Nummer gelesen.
+    $reorder = ['members' => ['mitglieder', 'ffk_update_member'], 'vehicles' => ['fahrzeuge', 'ffk_update_vehicle']];
+    if (count($seg) === 3 && $seg[0] === 'admin' && $seg[2] === 'reorder' && isset($reorder[$seg[1]]) && $method === 'POST') {
+        [$area, $update] = $reorder[$seg[1]];
+        $user = ffk_require_auth();
+        ffk_require_permission($user, $area);
+        $ids = ffk_body()['ids'] ?? null;
+        if (!is_array($ids)) {
+            ffk_fail(400, 'Es wurde keine Reihenfolge übergeben.');
+        }
+        // Die Position in der Liste ist die neue Sortiernummer (ab 1).
+        $position = 0;
+        foreach ($ids as $id) {
+            if (!is_int($id) && !(is_string($id) && ctype_digit($id))) {
+                ffk_fail(400, 'Die Reihenfolge enthält einen ungültigen Eintrag.');
+            }
+            $position++;
+            $update((int) $id, ['sortOrder' => $position]);
+        }
+        ffk_json(['ok' => true]);
+    }
+
     // ---------- ADMIN: Termine / Fahrzeuge / Mitglieder ----------
     $crud = [
         'events' => ['termine', 'ffk_validate_event', 'ffk_create_event', 'ffk_update_event', 'ffk_delete_event'],

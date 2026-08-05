@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, Trash2, Pencil, ImagePlus, Loader2, X } from "lucide-react";
+import { Plus, Trash2, Pencil, ImagePlus, Loader2, X, GripVertical, ArrowUp, ArrowDown } from "lucide-react";
 import type { Event, Vehicle, Member } from "@shared/schema";
 import { useAuth, authRequest, uploadFiles, withBase } from "@/lib/auth";
 import { queryClient } from "@/lib/queryClient";
@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Skeleton } from "@/components/ui/skeleton";
 import { RichTextEditor } from "@/components/editor";
 import { LocationField } from "@/components/map";
+import { MediaPickerButton } from "@/components/media-picker";
 import { AdminLayout, useAdminQuery } from "./core";
 import { formatDate } from "@/lib/format";
 
@@ -53,6 +54,11 @@ export function ImageField({
           <input type="file" accept="image/*" className="hidden" onChange={(e) => upload(e.target.files)} />
         </label>
       )}
+      <MediaPickerButton
+        label={value ? "Anderes Bild wählen" : "Aus Mediathek wählen"}
+        testId="button-image-from-library"
+        onSelect={(urls) => onChange(urls[0])}
+      />
     </div>
   );
 }
@@ -323,6 +329,11 @@ export function AdminMembers() {
     setBusy(true);
     try {
       const payload = { ...EMPTY_MEMBER, ...editing };
+      // Neue Einträge hinten anhängen statt an den Anfang zu setzen
+      if (!editing.id) {
+        const gruppe = payload.gruppe ?? "aktive";
+        payload.sortOrder = (members ?? []).filter((m) => m.gruppe === gruppe).length + 1;
+      }
       if (editing.id) {
         await authRequest(token, "PATCH", `/api/admin/members/${editing.id}`, payload);
       } else {
@@ -345,6 +356,59 @@ export function AdminMembers() {
     toast({ title: "Eintrag gelöscht" });
   };
 
+  // ---------- Reihenfolge ----------
+  // Gezogen wird am Desktop; auf Handy und Tablet funktioniert das Ziehen
+  // nicht zuverlässig, dafür gibt es die Pfeile.
+  const [dragId, setDragId] = useState<number | null>(null);
+  const [order, setOrder] = useState<Record<string, number[]>>({});
+
+  /** Aktuelle Reihenfolge einer Gruppe – bevorzugt die noch nicht gespeicherte. */
+  const listOf = (gruppe: string) => {
+    const alle = (members ?? []).filter((m) => m.gruppe === gruppe);
+    const eigene = order[gruppe];
+    if (!eigene) return alle;
+    const nachId = new Map(alle.map((m) => [m.id, m]));
+    const sortiert = eigene.map((id) => nachId.get(id)).filter((m): m is Member => !!m);
+    // Zwischenzeitlich neu angelegte Einträge hinten anhängen
+    return [...sortiert, ...alle.filter((m) => !eigene.includes(m.id))];
+  };
+
+  /** Speichert die Reihenfolge einer Gruppe. */
+  const saveOrder = async (gruppe: string, ids: number[]) => {
+    setOrder((o) => ({ ...o, [gruppe]: ids }));
+    try {
+      await authRequest(token, "POST", "/api/admin/members/reorder", { ids });
+      await queryClient.invalidateQueries({ queryKey: ["/api/members"] });
+      setOrder((o) => {
+        const rest = { ...o };
+        delete rest[gruppe];
+        return rest;
+      });
+    } catch (err: any) {
+      toast({ title: "Reihenfolge nicht gespeichert", description: err.message, variant: "destructive" });
+    }
+  };
+
+  /** Verschiebt einen Eintrag um eine Position. */
+  const move = (gruppe: string, index: number, richtung: -1 | 1) => {
+    const ids = listOf(gruppe).map((m) => m.id);
+    const ziel = index + richtung;
+    if (ziel < 0 || ziel >= ids.length) return;
+    [ids[index], ids[ziel]] = [ids[ziel], ids[index]];
+    saveOrder(gruppe, ids);
+  };
+
+  /** Legt den gezogenen Eintrag an der Position des Ziels ab. */
+  const dropOn = (gruppe: string, zielId: number) => {
+    if (dragId === null || dragId === zielId) return;
+    const ids = listOf(gruppe).map((m) => m.id);
+    const von = ids.indexOf(dragId);
+    const nach = ids.indexOf(zielId);
+    if (von < 0 || nach < 0) return;
+    ids.splice(nach, 0, ...ids.splice(von, 1));
+    saveOrder(gruppe, ids);
+  };
+
   const groups: { key: string; label: string }[] = [
     { key: "vorstandschaft", label: "Vorstandschaft & Kommandanten" },
     { key: "aktive", label: "Aktive Mannschaft" },
@@ -361,17 +425,51 @@ export function AdminMembers() {
         <Skeleton className="h-48 rounded-2xl" />
       ) : (
         groups.map((g) => {
-          const list = (members ?? []).filter((m) => m.gruppe === g.key);
+          const list = listOf(g.key);
           return (
             <div key={g.key} className="mb-8">
-              <h2 className="mb-3 font-semibold">{g.label}</h2>
+              <h2 className="mb-1 font-semibold">{g.label}</h2>
+              <p className="mb-3 text-xs text-muted-foreground">
+                Reihenfolge ändern: Eintrag am Griff ziehen oder die Pfeile benutzen.
+                So erscheinen die Personen auch auf der Seite „Über uns“.
+              </p>
               <div className="overflow-hidden rounded-2xl border border-card-border bg-card">
-                {list.map((m) => (
-                  <div key={m.id} data-testid={`row-admin-member-${m.id}`} className="flex items-center gap-3 border-b border-border px-4 py-2.5 text-sm last:border-b-0">
+                {list.map((m, i) => (
+                  <div
+                    key={m.id}
+                    data-testid={`row-admin-member-${m.id}`}
+                    draggable
+                    onDragStart={() => setDragId(m.id)}
+                    onDragEnd={() => setDragId(null)}
+                    onDragOver={(e) => e.preventDefault()}
+                    onDrop={(e) => { e.preventDefault(); dropOn(g.key, m.id); setDragId(null); }}
+                    className={`flex items-center gap-2 border-b border-border px-3 py-2.5 text-sm last:border-b-0 sm:gap-3 sm:px-4 ${
+                      dragId === m.id ? "opacity-50" : ""
+                    }`}
+                  >
+                    <GripVertical className="hidden h-4 w-4 shrink-0 cursor-grab text-muted-foreground sm:block" aria-hidden="true" />
+                    <div className="flex shrink-0 flex-col">
+                      <button
+                        onClick={() => move(g.key, i, -1)} disabled={i === 0}
+                        title="Nach oben" aria-label={`${m.name} nach oben`}
+                        data-testid={`button-member-up-${m.id}`}
+                        className="text-muted-foreground hover:text-foreground disabled:opacity-25"
+                      >
+                        <ArrowUp className="h-3.5 w-3.5" />
+                      </button>
+                      <button
+                        onClick={() => move(g.key, i, 1)} disabled={i === list.length - 1}
+                        title="Nach unten" aria-label={`${m.name} nach unten`}
+                        data-testid={`button-member-down-${m.id}`}
+                        className="text-muted-foreground hover:text-foreground disabled:opacity-25"
+                      >
+                        <ArrowDown className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                     {m.image ? (
-                      <img src={withBase(m.image)} alt="" className="h-9 w-9 rounded-full object-cover" />
+                      <img src={withBase(m.image)} alt="" className="h-9 w-9 shrink-0 rounded-full object-cover" />
                     ) : (
-                      <div className="h-9 w-9 rounded-full bg-secondary" />
+                      <div className="h-9 w-9 shrink-0 rounded-full bg-secondary" />
                     )}
                     <span className="min-w-0 flex-1">
                       <span className="block truncate font-medium">{m.name}</span>
