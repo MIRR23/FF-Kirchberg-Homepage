@@ -605,7 +605,7 @@ try {
   await page.waitForSelector('[data-testid="input-post-title"]', { timeout: 15000 });
 
   // Bereits hochgeladene Bilder über die Mediathek verknüpfen
-  await page.click('[data-testid="button-gallery-from-library"]');
+  await page.click('[data-testid="button-gallery-editor-from-library"]');
   await page.waitForSelector('[data-testid="input-media-search"]', { timeout: 15000 });
   check("Mediathek-Auswahl öffnet sich", await page.locator('[data-testid="input-media-search"]').isVisible());
   const kacheln = await page.locator('[data-testid^="button-pick-media-"]').count();
@@ -619,7 +619,7 @@ try {
   check("Zwei Bilder in die Galerie übernommen", inGalerie === 2, `${inGalerie}`);
 
   // Zusätzlich ein neues Bild hochladen
-  await page.setInputFiles('[data-testid="input-gallery-upload"]', photo.file);
+  await page.setInputFiles('[data-testid="input-gallery-editor-upload"]', photo.file);
   const dreiBilder = await waitFor(
     async () => (await page.locator('[data-testid="gallery-editor"] img').count()) === 3,
     { timeout: 30000 },
@@ -637,17 +637,17 @@ try {
 
   // Öffentliche Anzeige samt Vergrößern
   await gotoPage(page, `/beitrag/${created.slug}`, { expect: "Bilder" });
-  const kachelnOeffentlich = await page.locator('[data-testid^="button-gallery-image-"]').count();
+  const kachelnOeffentlich = await page.locator('[data-testid^="button-post-gallery-image-"]').count();
   check("Galerie erscheint auf der Beitragsseite", kachelnOeffentlich === 3, `${kachelnOeffentlich}`);
-  await page.click('[data-testid="button-gallery-image-0"]');
-  await page.waitForSelector('[data-testid="gallery-lightbox"]', { timeout: 10000 });
-  check("Klick vergrößert das Bild", await page.locator('[data-testid="gallery-lightbox"]').isVisible());
-  await page.click('[data-testid="button-gallery-next"]');
+  await page.click('[data-testid="button-post-gallery-image-0"]');
+  await page.waitForSelector('[data-testid="post-gallery-lightbox"]', { timeout: 10000 });
+  check("Klick vergrößert das Bild", await page.locator('[data-testid="post-gallery-lightbox"]').isVisible());
+  await page.click('[data-testid="button-post-gallery-next"]');
   await page.waitForTimeout(300);
-  check("Weiterblättern funktioniert", await page.locator('[data-testid="gallery-lightbox"]').isVisible());
+  check("Weiterblättern funktioniert", await page.locator('[data-testid="post-gallery-lightbox"]').isVisible());
   await page.keyboard.press("Escape");
   await page.waitForTimeout(400);
-  check("Escape schließt die Großansicht", (await page.locator('[data-testid="gallery-lightbox"]').count()) === 0);
+  check("Escape schließt die Großansicht", (await page.locator('[data-testid="post-gallery-lightbox"]').count()) === 0);
 
   // Fremde Adressen werden abgewiesen
   const fremd = await fetch(`${BASE}/api.php?r=${encodeURIComponent(`/admin/posts/${created.id}`)}&_method=PATCH`, {
@@ -658,7 +658,54 @@ try {
   check("Fremde Bildadressen werden abgelehnt", fremd.status === 400);
 
   // =======================================================================
-  group("15. Reihenfolge der Mitglieder");
+  group("15. Mehrere Bilder je Fahrzeug");
+  // =======================================================================
+  const fahrzeug = (await api("/vehicles")).body[0];
+  await gotoPageRaw(page, "/intern/fahrzeuge");
+  await page.click(`[data-testid="button-edit-vehicle-${fahrzeug.id}"]`);
+  await page.waitForSelector('[data-testid="input-vehicle-name"]', { timeout: 15000 });
+
+  await page.click('[data-testid="button-vehicle-gallery-from-library"]');
+  await page.waitForSelector('[data-testid="input-media-search"]', { timeout: 15000 });
+  await page.locator('[data-testid^="button-pick-media-"]').nth(2).click();
+  await page.locator('[data-testid^="button-pick-media-"]').nth(3).click();
+  await page.click('[data-testid="button-media-confirm"]');
+  await page.waitForTimeout(500);
+  check(
+    "Zwei Bilder im Fahrzeug-Dialog übernommen",
+    (await page.locator('[data-testid="vehicle-gallery"] img').count()) === 2,
+  );
+
+  await page.click('[data-testid="button-save-vehicle"]');
+  await page.waitForTimeout(1500);
+
+  const fahrzeugNachher = (await api("/vehicles")).body.find((v) => v.id === fahrzeug.id);
+  let fahrzeugBilder = [];
+  try { fahrzeugBilder = JSON.parse(fahrzeugNachher.images); } catch { fahrzeugBilder = []; }
+  check("Fahrzeug-Galerie wurde gespeichert", fahrzeugBilder.length === 2, JSON.stringify(fahrzeugBilder).slice(0, 80));
+  check("Titelbild des Fahrzeugs blieb unverändert", fahrzeugNachher.image === fahrzeug.image);
+
+  await gotoPage(page, "/geraetehaus", { expect: fahrzeug.name });
+  const fahrzeugKacheln = await page.locator(`[data-testid^="button-vehicle-gallery-${fahrzeug.id}-image-"]`).count();
+  check("Gerätehaus zeigt die Fahrzeugbilder", fahrzeugKacheln === 2, `${fahrzeugKacheln}`);
+  await page.click(`[data-testid="button-vehicle-gallery-${fahrzeug.id}-image-0"]`);
+  await page.waitForSelector(`[data-testid="vehicle-gallery-${fahrzeug.id}-lightbox"]`, { timeout: 10000 });
+  check("Fahrzeugbild lässt sich vergrößern", true);
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(400);
+
+  const fremdesFahrzeugbild = await fetch(
+    `${BASE}/api.php?r=${encodeURIComponent(`/admin/vehicles/${fahrzeug.id}`)}&_method=PATCH`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token0}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ images: ["https://fremde-seite.example/bild.jpg"] }),
+    },
+  );
+  check("Fremde Bildadressen bei Fahrzeugen abgelehnt", fremdesFahrzeugbild.status === 400);
+
+  // =======================================================================
+  group("16. Reihenfolge der Mitglieder");
   // =======================================================================
   for (const name of ["Anton Erster", "Berta Zweite", "Cäsar Dritter"]) {
     await api("/admin/members", {
@@ -722,7 +769,7 @@ try {
   );
 
   // =======================================================================
-  group("16. Erneutes Einlesen überschreibt nichts");
+  group("17. Erneutes Einlesen überschreibt nichts");
   // =======================================================================
   const vorReimport = {
     mitglieder: (await api("/members")).body.length,
@@ -750,7 +797,7 @@ try {
   check("Fahrzeuge unverändert", nachReimport.fahrzeuge === vorReimport.fahrzeuge);
 
   // =======================================================================
-  group("17. Keine Fehler im Browser");
+  group("18. Keine Fehler im Browser");
   // =======================================================================
   // Externe Ressourcen (Schriftarten, Kartenkacheln) sind in der Testumgebung
   // ohne Internetzugang nicht erreichbar – das sind keine Fehler der Anwendung.

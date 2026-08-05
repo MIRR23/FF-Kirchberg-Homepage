@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { RichTextEditor } from "@/components/editor";
 import { LocationField } from "@/components/map";
 import { MediaPickerButton } from "@/components/media-picker";
+import { GalleryField, parseImages } from "@/components/gallery";
 import { AdminLayout, useAdminQuery } from "./core";
 import { formatDate } from "@/lib/format";
 
@@ -287,6 +288,12 @@ export function AdminVehicles() {
                 </div>
               </div>
               <ImageField value={editing.image ?? null} onChange={(v) => setEditing({ ...editing, image: v })} label="Fahrzeugbild" />
+              <GalleryField
+                value={parseImages(editing.images)}
+                onChange={(images) => setEditing({ ...editing, images: JSON.stringify(images) })}
+                hint="Erscheinen als Bilderreihe unter der Fahrzeugbeschreibung."
+                testId="vehicle-gallery"
+              />
               <div className="space-y-1.5">
                 <Label>Beschreibung</Label>
                 <RichTextEditor

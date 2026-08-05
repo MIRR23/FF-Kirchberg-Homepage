@@ -176,7 +176,7 @@ verloren.
 Beiträge, deren Bilder bereits beim ersten Einlesen verloren gingen, lassen
 sich damit allerdings nicht mehr reparieren: Für diese fügen Sie die Bilder
 im internen Bereich unter „Weitere Bilder" von Hand hinzu (siehe
-**Mehrere Bilder je Beitrag** weiter unten).
+**Mehrere Bilder je Beitrag und Fahrzeug** weiter unten).
 
 Der Wert `'neu'` darf anschließend in der `config.php` stehen bleiben; die
 Erstbefüllung läuft nur ein einziges Mal. Soll sie später noch einmal laufen,
@@ -277,13 +277,14 @@ für die betreffende IP-Adresse vorübergehend.
 - **Beiträge & Einsätze:** Titel, Kategorie, Einsatzstichwort/-ort, Datum, Titelbild, Text mit
   Bild-Upload direkt im Editor. Entwürfe möglich. Beiträge erscheinen automatisch auf
   Startseite, in „Aktuelles", „Einsätze" und im Jahres-Archiv.
-- **Mehrere Bilder je Beitrag:** Unter dem Titelbild gibt es den Bereich
-  **Weitere Bilder**. Dort lassen sich beliebig viele Fotos hinzufügen – neu
+- **Mehrere Bilder je Beitrag und Fahrzeug:** Unter dem Titelbild gibt es den
+  Bereich **Weitere Bilder**. Dort lassen sich beliebig viele Fotos hinzufügen – neu
   hochladen oder mit **Aus Mediathek** aus den bereits vorhandenen Bildern
   auswählen (auch aus den rund 460 von der alten Website übernommenen).
   Die Reihenfolge ändern die Pfeile auf den Vorschaubildern. Besucher sehen
   die Bilder als Reihe unter dem Text; ein Klick zeigt sie groß, geblättert
-  wird mit den Pfeilen oder der Tastatur.
+  wird mit den Pfeilen oder der Tastatur. Bei **Fahrzeugen** gibt es denselben
+  Bereich – die Bilder erscheinen dort unter der Beschreibung im Gerätehaus.
 - **Bereits hochgeladene Bilder verknüpfen:** Der Knopf **Aus Mediathek**
   steht überall dort, wo ein Bild ausgewählt wird – beim Titelbild, in der
   Galerie sowie bei Fahrzeugen, Mitgliedern und dem Startseiten-Bild. Ein
@@ -297,7 +298,7 @@ für die betreffende IP-Adresse vorübergehend.
   Datenschutzgründen erst nach Klick auf „Karte anzeigen" geladen wird
   (2-Klick-Lösung), plus einen Link „In Google Maps öffnen" zur Navigation.
   Die Datenschutzerklärung enthält den passenden Abschnitt dazu.
-- **Fahrzeuge:** Name, Typ, Bild, Beschreibung, Sortierung.
+- **Fahrzeuge:** Name, Typ, Titelbild, weitere Bilder, Beschreibung, Sortierung.
 - **Mitglieder:** Name, Funktion, Gruppe (Vorstandschaft/Aktive), optionales Foto.
   Die **Reihenfolge** wird je Gruppe festgelegt: am Computer den Eintrag am
   Griff links anfassen und an die gewünschte Stelle ziehen, auf Handy und
