@@ -98,8 +98,11 @@ Standard; im Zweifel kurz beim Support nachfragen.
    also `index.html`, `api.php`, `datei.php`, `config.php`, `assets/`,
    `php/`, `uploads/`, `migration-data/`.
 
-> Das dauert einige Minuten: `uploads/` enthält rund 460 Bilder der alten
-> Website (ca. 170 MB). Nicht abbrechen.
+> **Wichtig:** Das dauert einige Minuten – `uploads/` enthält rund 460 Bilder
+> der alten Website (ca. 170 MB). Warten Sie, bis der Upload komplett
+> durchgelaufen ist, **bevor** Sie die Website zum ersten Mal aufrufen.
+> Ruft man sie zu früh auf, meldet die Seite, dass noch Bilder fehlen, und
+> richtet sich erst nach dem vollständigen Upload ein.
 
 4. Danach prüfen, dass der Ordner **`uploads/`** beschreibbar ist
    (Rechte `755`, bei manchen Servern `775`). Das ist meist automatisch der Fall.
@@ -128,7 +131,8 @@ Sekunden – danach ist die Seite vollständig da.
 | „Die Datei config.php fehlt…"                         | Schritt 3 wurde übersprungen oder die Datei liegt nicht neben `index.html`.                                        |
 | „Die Datenbank ist nicht erreichbar…"                 | Zugangsdaten in `config.php` prüfen (Tippfehler, falscher Datenbankname).                                          |
 | Seite bleibt weiß                                     | `assets/` wurde nicht vollständig hochgeladen. Erneut hochladen.                                                    |
-| Bilder fehlen                                         | Der Ordner `uploads/` wurde nicht (vollständig) hochgeladen.                                                        |
+| „Die Bilder sind noch nicht vollständig hochgeladen…" | Der Upload von `uploads/` läuft noch oder wurde abgebrochen. Einfach fertig hochladen und die Seite erneut aufrufen. |
+| Bilder fehlen auf der fertigen Seite                  | Siehe **Bilder nachträglich ergänzen** weiter unten.                                                                |
 | „Der Upload ist zu groß für die Server-Einstellungen" | Schritt 4: `upload_max_filesize` und `post_max_size` erhöhen.                                                       |
 | Upload bricht ohne Meldung ab                         | `memory_limit` und `max_execution_time` erhöhen (Schritt 4).                                                        |
 
@@ -139,6 +143,40 @@ Zum Suchen eines Fehlers kann in `config.php` vorübergehend
 `'production'` zurückstellen**.
 
 ---
+
+## Bilder nachträglich ergänzen
+
+Diesen Abschnitt brauchen Sie nur, wenn beim allerersten Aufruf der Website noch
+nicht alle Bilder auf dem Server lagen (z. B. weil der SFTP-Upload noch lief).
+Dann fehlen sie dauerhaft in Beiträgen und Mediathek: Die Erstbefüllung
+verknüpft nur Bilder, die sie zu diesem Zeitpunkt vorfindet.
+
+Neuere Fassungen brechen die Erstbefüllung in so einem Fall mit einer
+Meldung ab, sodass das gar nicht mehr passieren kann. So reparieren Sie eine
+bereits betroffene Installation:
+
+1. **`uploads/` vollständig hochladen.** Den Ordner `uploads/` aus dem
+   Komplett-Paket noch einmal per SFTP übertragen und dabei „Überschreiben"
+   bzw. „Fehlende ergänzen" wählen. In FileZilla: alle Dateien markieren,
+   hochladen, bei der Rückfrage **Überschreiben** wählen.
+2. **In `config.php` das Wort `'neu'` eintragen:**
+
+   ```php
+   'auto_migrate' => 'neu',
+   ```
+
+3. **Website einmal aufrufen.** Beiträge, Seiten, Fahrzeuge und Mediathek
+   werden frisch aus `migration-data/` aufgebaut – diesmal mit allen Bildern.
+
+Dabei bleiben erhalten: **Benutzerkonten mit geänderten Passwörtern**, die
+unter „Dateien" hochgeladenen Downloads und die Besucherstatistik.
+Überschrieben werden die migrierten Inhalte – **selbst angelegte Beiträge,
+Termine und Mitglieder gehen dabei verloren.** Reparieren Sie also am besten,
+bevor Sie eigene Inhalte pflegen.
+
+Der Wert `'neu'` darf anschließend in der `config.php` stehen bleiben; die
+Erstbefüllung läuft nur ein einziges Mal. Soll sie später noch einmal laufen,
+tragen Sie ein anderes Wort ein (z. B. `'neu2'`).
 
 ## Update auf eine neue Version
 

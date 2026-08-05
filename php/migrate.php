@@ -18,6 +18,11 @@ defined('FFK_APP') || exit;
 require_once __DIR__ . '/content.php';
 require_once __DIR__ . '/images.php';
 
+/** Die Bilder in uploads/ sind noch nicht vollständig auf dem Server. */
+final class FfkIncompleteMediaException extends RuntimeException
+{
+}
+
 /** Quellordner der WordPress-Exporte. */
 function ffk_migration_src(): string
 {
@@ -37,7 +42,15 @@ function ffk_migration_uploads(): string
  */
 function ffk_ensure_installed(): void
 {
-    if (ffk_get_setting('install_done') === '1') {
+    // Steht in config.php ein Text statt true/false (z. B. 'neu'), werden die
+    // Inhalte einmalig neu eingelesen – praktisch, wenn beim ersten Aufruf
+    // noch nicht alle Bilder auf dem Server lagen. Der Wert darf danach
+    // stehen bleiben; erst ein anderer Text löst ein weiteres Einlesen aus.
+    $mode = ffk_config('auto_migrate', true);
+    $token = (is_string($mode) && $mode !== '') ? $mode : null;
+    $forced = $token !== null && ffk_get_setting('migration_token') !== $token;
+
+    if (!$forced && ffk_get_setting('install_done') === '1') {
         return;
     }
 
@@ -48,32 +61,52 @@ function ffk_ensure_installed(): void
         // erwartet. Dann hier nichts tun, statt ein zweites Mal zu befüllen.
         return;
     }
+    $unvollstaendig = null;
     try {
-        if (ffk_get_setting('install_done') === '1') {
+        if (!$forced && ffk_get_setting('install_done') === '1') {
             return; // ein paralleler Aufruf war schneller
         }
 
-        if (ffk_count_users() === 0) {
-            if (!ffk_config('auto_migrate', true)) {
+        if ($forced || ffk_count_users() === 0) {
+            if (!$forced && $mode === false) {
                 return; // Erstbefüllung abgeschaltet – Flag bewusst nicht setzen
             }
-            ffk_run_migration();
+            try {
+                // Beim erzwungenen Neu-Einlesen bleiben die Benutzerkonten
+                // erhalten, damit geänderte Passwörter nicht verloren gehen.
+                ffk_run_migration($forced);
+            } catch (FfkIncompleteMediaException $e) {
+                // Kein Flag setzen: Sobald der Upload vollständig ist, läuft
+                // die Einrichtung beim nächsten Aufruf von selbst weiter.
+                $unvollstaendig = $e->getMessage();
+            }
+            if ($unvollstaendig === null && $token !== null) {
+                ffk_set_setting('migration_token', $token);
+            }
         }
 
-        // Neue feste Seiten in bestehenden Datenbanken nachziehen (idempotent):
-        // die Migration läuft nur bei leerer Datenbank, daher hier ergänzen.
-        if (ffk_get_page_by_slug('first-responder') === null) {
-            ffk_create_page([
-                'slug' => 'first-responder',
-                'title' => 'First Responder',
-                'content' => FFK_FIRST_RESPONDER_HTML,
-                'updatedAt' => ffk_now_iso(),
-            ]);
-        }
+        if ($unvollstaendig === null) {
+            // Neue feste Seiten in bestehenden Datenbanken nachziehen (idempotent):
+            // die Migration läuft nur bei leerer Datenbank, daher hier ergänzen.
+            if (ffk_get_page_by_slug('first-responder') === null) {
+                ffk_create_page([
+                    'slug' => 'first-responder',
+                    'title' => 'First Responder',
+                    'content' => FFK_FIRST_RESPONDER_HTML,
+                    'updatedAt' => ffk_now_iso(),
+                ]);
+            }
 
-        ffk_set_setting('install_done', '1');
+            ffk_set_setting('install_done', '1');
+        }
     } finally {
         ffk_exec("SELECT RELEASE_LOCK('ffk_install')");
+    }
+
+    // Erst nach dem Freigeben der Sperre abbrechen (exit überspringt finally).
+    if ($unvollstaendig !== null) {
+        error_log('[FFK] Erstbefüllung verschoben: ' . $unvollstaendig);
+        ffk_fail(503, $unvollstaendig);
     }
 }
 
@@ -118,6 +151,10 @@ final class FfkMediaIndex
     public array $byId = [];
     /** @var array<string,string> */
     public array $byKey = [];
+    /** Anzahl der Bilder, die in uploads/wp/ fehlen oder unvollständig sind. */
+    public int $missing = 0;
+    /** Gesamtzahl der erwarteten Bilder. */
+    public int $expected = 0;
 }
 
 /** Liest die Mediathek der alten Seite ein und befüllt die Such-Tabellen. */
@@ -139,8 +176,12 @@ function ffk_migration_prepare_media(FfkMediaIndex $index): array
         $destName = $id . '_' . $basename;
         $dest = $uploads . '/' . $destName;
 
-        // Bereits in uploads/wp vorhandene Dateien (aus dem Paket) direkt nutzen
-        if (!is_file($dest)) {
+        $index->expected++;
+
+        // Bereits in uploads/wp vorhandene Dateien (aus dem Paket) direkt nutzen.
+        // Eine Datei mit 0 Bytes stammt aus einem abgebrochenen Upload und
+        // zählt deshalb ebenfalls als fehlend.
+        if (!is_file($dest) || filesize($dest) === 0) {
             $localFile = ffk_migration_src() . '/media/' . $destName;
             if (!is_file($localFile) || filesize($localFile) === 0) {
                 $missing++;
@@ -161,6 +202,7 @@ function ffk_migration_prepare_media(FfkMediaIndex $index): array
         $index->byKey[mb_strtolower($dir . '/' . $stem . $ext, 'UTF-8')] = $url;
         $copied++;
     }
+    $index->missing = $missing;
     error_log("[FFK] Migration – Medien: $copied verknüpft, $missing fehlen");
     return $wpMedia;
 }
@@ -281,7 +323,7 @@ function ffk_migration_make_thumb(?string $localUrl): ?string
  * Website nachgeladen: Alle benötigten Bilder liegen im Paket (uploads/wp/),
  * und der Zielserver soll beim Einrichten keine Verbindung nach außen brauchen.
  */
-function ffk_run_migration(): void
+function ffk_run_migration(bool $keepUsers = false): void
 {
     @set_time_limit(0);
     @ini_set('memory_limit', '512M');
@@ -289,28 +331,53 @@ function ffk_run_migration(): void
     $index = new FfkMediaIndex();
     $wpMedia = ffk_migration_prepare_media($index);
 
+    // Abbruch, solange Bilder fehlen: Die Erstbefüllung verknüpft nur Bilder,
+    // die zu diesem Zeitpunkt wirklich auf dem Server liegen. Liefe sie mit
+    // einem halb übertragenen uploads/-Ordner durch, fehlten die Bilder
+    // anschließend dauerhaft in Beiträgen und Mediathek – ohne jeden Hinweis.
+    // Deshalb hier abbrechen, ohne die Datenbank anzufassen; sobald der Upload
+    // vollständig ist, läuft die Erstbefüllung beim nächsten Aufruf durch.
+    if ($index->missing > 0 && !ffk_config('allow_incomplete_media', false)) {
+        $vorhanden = $index->expected - $index->missing;
+        throw new FfkIncompleteMediaException(sprintf(
+            'Die Bilder sind noch nicht vollständig hochgeladen (%d von %d vorhanden). '
+            . 'Bitte den Ordner uploads/ vollständig auf den Server übertragen und die Seite '
+            . 'danach erneut aufrufen – die Einrichtung setzt dann von selbst fort.',
+            $vorhanden,
+            $index->expected
+        ));
+    }
+
     // ---------- Tabellen leeren ----------
-    foreach (['posts', 'categories', 'events', 'vehicles', 'members', 'pages', 'media', 'users'] as $table) {
+    $tables = ['posts', 'categories', 'events', 'vehicles', 'members', 'pages', 'media'];
+    if (!$keepUsers) {
+        $tables[] = 'users';
+    }
+    foreach ($tables as $table) {
         ffk_exec("DELETE FROM `$table`");
     }
 
     // ---------- Benutzer ----------
-    ffk_create_user([
-        'username' => 'admin',
-        'password' => ffk_hash_password('FFK-Admin-2026!'),
-        'displayName' => 'Administrator',
-        'role' => 'admin',
-        'permissions' => '[]',
-        'active' => 1,
-    ]);
-    ffk_create_user([
-        'username' => 'redakteur',
-        'password' => ffk_hash_password('FFK-Redakteur-2026!'),
-        'displayName' => 'Max Beispiel-Redakteur',
-        'role' => 'editor',
-        'permissions' => json_encode(['einsaetze', 'neuigkeiten', 'termine']),
-        'active' => 1,
-    ]);
+    // Beim erneuten Einlesen bleiben bestehende Konten (und damit geänderte
+    // Passwörter) erhalten – neu angelegt wird nur, wenn es noch keine gibt.
+    if (ffk_count_users() === 0) {
+        ffk_create_user([
+            'username' => 'admin',
+            'password' => ffk_hash_password('FFK-Admin-2026!'),
+            'displayName' => 'Administrator',
+            'role' => 'admin',
+            'permissions' => '[]',
+            'active' => 1,
+        ]);
+        ffk_create_user([
+            'username' => 'redakteur',
+            'password' => ffk_hash_password('FFK-Redakteur-2026!'),
+            'displayName' => 'Max Beispiel-Redakteur',
+            'role' => 'editor',
+            'permissions' => json_encode(['einsaetze', 'neuigkeiten', 'termine']),
+            'active' => 1,
+        ]);
+    }
 
     // ---------- Kategorien ----------
     $wpCats = ffk_migration_json('categories');
