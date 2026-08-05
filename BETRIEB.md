@@ -137,6 +137,7 @@ Sekunden – danach ist die Seite vollständig da.
 | Upload bricht ohne Meldung ab                         | `memory_limit` und `max_execution_time` erhöhen (Schritt 4).                                                        |
 | „Das Bild ist mit … Megapixeln zu groß…"              | `memory_limit` erhöhen (Schritt 4) – oder das Foto vorher verkleinern.                                              |
 | „Auf dem Server fehlt die Bildbearbeitung…"           | Beim Hoster die PHP-Erweiterung **gd** (oder **imagick**) aktivieren lassen.                                        |
+| „Das Bild konnte nicht umgewandelt werden…"           | Die Meldung nennt die technischen Gründe – bitte vollständig an den Hoster oder die Entwicklung weitergeben.         |
 | „Der Ordner uploads/neu/ ist nicht beschreibbar."     | Schreibrechte für `uploads/` setzen (755 bzw. 775).                                                                 |
 
 Technische Fehlerdetails schreibt PHP ins Fehlerprotokoll des Servers
@@ -337,11 +338,13 @@ Handy-Fotos bis 30 MB) werden beim Upload automatisch fürs Web aufbereitet:
 - Übernahme der EXIF-Drehung (Hochformat-Fotos stehen richtig)
 - Entfernung aller Metadaten – **inklusive GPS-Standort** vom Handy (Datenschutz)
 
-Die Verarbeitung nutzt **Imagick**, falls auf dem Server vorhanden, sonst **GD**.
-Kann der Server kein WebP schreiben – manche Hoster übersetzen GD ohne WebP –,
-wird automatisch JPEG (bzw. PNG bei durchsichtigen Bildern) verwendet;
-verkleinert und von Metadaten befreit wird in jedem Fall. Schlägt ein Upload
-fehl, nennt die Meldung den Dateinamen und den konkreten Grund.
+Die Verarbeitung probiert der Reihe nach jede vorhandene Bibliothek
+(**Imagick**, **GD**) und jedes mögliche Ausgabeformat durch: WebP, sonst JPEG,
+bei durchsichtigen Bildern PNG. Scheitert eine Bibliothek – manche Hoster
+schränken Imagick per `policy.xml` ein oder übersetzen GD ohne WebP –, wird
+automatisch die nächste genommen. Verkleinert und von Metadaten befreit wird in
+jedem Fall. Klappt gar nichts, nennt die Meldung die konkreten Gründe und was
+der Server kann; dieser Text lässt sich direkt an den Hoster weitergeben.
 Redakteure müssen nichts beachten und können Fotos direkt vom Handy hochladen.
 Nur animierte GIFs bleiben unverändert.
 

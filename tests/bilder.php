@@ -42,7 +42,8 @@ function metadaten(string $datei): ?string
     return is_string($out) && $out !== '' ? $out : null;
 }
 
-echo "Bildverarbeitung dieses Servers: " . json_encode(ffk_image_capabilities()) . "\n";
+echo "Bildverarbeitung dieses Servers: " . ffk_image_capabilities_text() . "\n";
+echo "Im Detail: " . json_encode(ffk_image_capabilities()) . "\n";
 
 // ---------------------------------------------------------------------------
 echo "\n▶ Testfoto erzeugen (2400x1600, EXIF-Drehung und GPS)\n";
@@ -61,46 +62,64 @@ imagedestroy($im);
 pruefe('Testfoto angelegt', is_file($src) && filesize($src) > 0);
 
 // ---------------------------------------------------------------------------
-echo "\n▶ Jedes Ausgabeformat einzeln\n";
+echo "\n▶ Jedes Ausgabeformat einzeln, mit jeder vorhandenen Bibliothek\n";
 $can = ffk_image_capabilities();
-foreach ([['webp', 'image/webp'], ['jpeg', 'image/jpeg'], ['png', 'image/png']] as [$format, $mime]) {
-    if (!$can[$format]) {
-        echo "  – $format wird von diesem Server nicht unterstützt, übersprungen\n";
+foreach ($can['engines'] as $engine) {
+  foreach ([['webp', 'image/webp'], ['jpeg', 'image/jpeg'], ['png', 'image/png']] as [$format, $mime]) {
+    if (!$can[$engine][$format]) {
+        echo "  – $engine/$format wird von diesem Server nicht unterstützt, übersprungen\n";
         continue;
     }
-    $dest = "$tmp/out.$format";
+    $dest = "$tmp/out-$engine.$format";
     @unlink($dest);
-    $ok = $can['engine'] === 'imagick'
-        ? ffk_optimize_with_imagick($src, $dest, $format)
-        : ffk_optimize_with_gd($src, $dest, IMAGETYPE_JPEG, $format);
+    $fehlgeschlagen = null;
+    try {
+        if ($engine === 'imagick') {
+            ffk_optimize_with_imagick($src, $dest, $format);
+        } else {
+            ffk_optimize_with_gd($src, $dest, IMAGETYPE_JPEG, $format);
+        }
+    } catch (Throwable $e) {
+        $fehlgeschlagen = $e->getMessage();
+    }
     $info = is_file($dest) ? @getimagesize($dest) : false;
 
-    pruefe("$format wird geschrieben", $ok && $info !== false && $info['mime'] === $mime,
-        $info ? "{$info[0]}x{$info[1]}" : 'keine Datei');
+    pruefe("$engine/$format wird geschrieben",
+        $fehlgeschlagen === null && $info !== false && $info['mime'] === $mime,
+        $fehlgeschlagen ?? ($info ? "{$info[0]}x{$info[1]}" : 'keine Datei'));
     if ($info === false) {
         continue;
     }
-    pruefe("$format: auf 1600 px begrenzt", max($info[0], $info[1]) === 1600, "{$info[0]}x{$info[1]}");
-    pruefe("$format: EXIF-Drehung angewendet", $info[1] > $info[0], "{$info[0]}x{$info[1]}");
+    pruefe("$engine/$format: auf 1600 px begrenzt", max($info[0], $info[1]) === 1600, "{$info[0]}x{$info[1]}");
+    pruefe("$engine/$format: EXIF-Drehung angewendet", $info[1] > $info[0], "{$info[0]}x{$info[1]}");
     $meta = metadaten($dest);
     if ($meta === null) {
         echo "  – Metadatenprüfung übersprungen (exiftool fehlt)\n";
     } else {
-        pruefe("$format: GPS und Kameradaten entfernt",
+        pruefe("$engine/$format: GPS und Kameradaten entfernt",
             preg_match('/GPS|TestPhone|Vertraulich/i', $meta) !== 1);
     }
+  }
 }
 
 // ---------------------------------------------------------------------------
 echo "\n▶ Formatwahl\n";
-pruefe('bevorzugt WebP, wenn der Server es kann',
-    !$can['webp'] || ffk_image_target_format(false) === 'webp');
-pruefe('weicht ohne WebP auf JPEG oder PNG aus',
-    $can['webp'] || in_array(ffk_image_target_format(false), ['jpeg', 'png'], true));
+foreach ($can['engines'] as $engine) {
+    $reihenfolge = ffk_image_target_formats($engine, false);
+    pruefe("$engine: bevorzugt WebP, wenn möglich",
+        !$can[$engine]['webp'] || ($reihenfolge[0] ?? '') === 'webp', implode(' > ', $reihenfolge));
+    pruefe("$engine: hat mindestens ein Ausgabeformat", $reihenfolge !== [], implode(' > ', $reihenfolge));
+    $mitTransparenz = ffk_image_target_formats($engine, true);
+    pruefe("$engine: PNG vor JPEG bei Transparenz",
+        !$can[$engine]['png'] || !$can[$engine]['jpeg']
+        || array_search('png', $mitTransparenz, true) < array_search('jpeg', $mitTransparenz, true),
+        implode(' > ', $mitTransparenz));
+}
 
 // ---------------------------------------------------------------------------
 echo "\n▶ Transparenz\n";
-if ($can['jpeg']) {
+$engine = $can['engines'][0] ?? 'gd';
+if ($can[$engine]['jpeg']) {
     $png = "$tmp/transparent.png";
     $t = imagecreatetruecolor(400, 300);
     imagesavealpha($t, true);
@@ -108,10 +127,18 @@ if ($can['jpeg']) {
     imagepng($t, $png);
     imagedestroy($t);
     $dest = "$tmp/flach.jpg";
-    $ok = $can['engine'] === 'imagick'
-        ? ffk_optimize_with_imagick($png, $dest, 'jpeg')
-        : ffk_optimize_with_gd($png, $dest, IMAGETYPE_PNG, 'jpeg');
-    pruefe('durchsichtiges PNG wird als JPEG gespeichert', $ok && is_file($dest) && filesize($dest) > 0);
+    $fehler2 = null;
+    try {
+        if ($engine === 'imagick') {
+            ffk_optimize_with_imagick($png, $dest, 'jpeg');
+        } else {
+            ffk_optimize_with_gd($png, $dest, IMAGETYPE_PNG, 'jpeg');
+        }
+    } catch (Throwable $e) {
+        $fehler2 = $e->getMessage();
+    }
+    pruefe('durchsichtiges PNG wird als JPEG gespeichert',
+        $fehler2 === null && is_file($dest) && filesize($dest) > 0, (string) $fehler2);
 }
 
 // ---------------------------------------------------------------------------
