@@ -242,6 +242,53 @@ function ffk_optimize_image(string $path, string $mimeType): string
 }
 
 /**
+ * Wendet die EXIF-Drehung an.
+ *
+ * autoOrientImage() gibt es erst ab Imagick 3.3 / ImageMagick 6.9 – ältere
+ * Fassungen sind bei Hostern durchaus verbreitet. Fehlt die Methode, wird die
+ * Drehung von Hand ausgeführt.
+ */
+function ffk_imagick_auto_orient(Imagick $im): void
+{
+    if (method_exists($im, 'autoOrientImage')) {
+        $im->autoOrientImage();
+        $im->setImageOrientation(Imagick::ORIENTATION_TOPLEFT);
+        return;
+    }
+
+    $hintergrund = new ImagickPixel('white');
+    switch ($im->getImageOrientation()) {
+        case Imagick::ORIENTATION_TOPRIGHT:
+            $im->flopImage();
+            break;
+        case Imagick::ORIENTATION_BOTTOMRIGHT:
+            $im->rotateImage($hintergrund, 180);
+            break;
+        case Imagick::ORIENTATION_BOTTOMLEFT:
+            $im->flopImage();
+            $im->rotateImage($hintergrund, 180);
+            break;
+        case Imagick::ORIENTATION_LEFTTOP:
+            $im->flopImage();
+            $im->rotateImage($hintergrund, -90);
+            break;
+        case Imagick::ORIENTATION_RIGHTTOP:
+            $im->rotateImage($hintergrund, 90);
+            break;
+        case Imagick::ORIENTATION_RIGHTBOTTOM:
+            $im->flopImage();
+            $im->rotateImage($hintergrund, 90);
+            break;
+        case Imagick::ORIENTATION_LEFTBOTTOM:
+            $im->rotateImage($hintergrund, -90);
+            break;
+        default:
+            break; // bereits richtig herum oder unbekannt
+    }
+    $im->setImageOrientation(Imagick::ORIENTATION_TOPLEFT);
+}
+
+/**
  * Variante mit Imagick.
  *
  * @throws Throwable mit der Originalmeldung – manche Hoster schränken Imagick
@@ -252,8 +299,7 @@ function ffk_optimize_with_imagick(string $src, string $dest, string $format): v
     $im = new Imagick($src);
     try {
         // EXIF-Drehung ins Bild übernehmen und Orientierungs-Flag zurücksetzen
-        $im->autoOrientImage();
-        $im->setImageOrientation(Imagick::ORIENTATION_TOPLEFT);
+        ffk_imagick_auto_orient($im);
 
         if ($im->getImageWidth() > FFK_IMAGE_MAX_EDGE || $im->getImageHeight() > FFK_IMAGE_MAX_EDGE) {
             // bestfit=true begrenzt beide Kanten, ohne das Seitenverhältnis zu ändern
@@ -283,6 +329,10 @@ function ffk_optimize_with_imagick(string $src, string $dest, string $format): v
 /**
  * Variante mit GD. GD schreibt grundsätzlich keine Metadaten mit.
  *
+ * Hier und in den GD-Hilfsfunktionen steht bewusst kein imagedestroy(): Seit
+ * PHP 8.0 sind GD-Bilder Objekte und geben sich selbst frei, seit PHP 8.5 ist
+ * der Aufruf zusätzlich als veraltet gemeldet.
+ *
  * @throws FfkImageException mit dem konkreten Grund
  */
 function ffk_optimize_with_gd(string $src, string $dest, int $imageType, string $format): void
@@ -291,27 +341,22 @@ function ffk_optimize_with_gd(string $src, string $dest, int $imageType, string 
     if ($img === null) {
         throw new FfkImageException('Bildtyp kann von GD nicht gelesen werden');
     }
-    try {
-        $img = ffk_gd_apply_exif_rotation($img, $src, $imageType);
-        $img = ffk_gd_resize_within($img, FFK_IMAGE_MAX_EDGE);
 
-        if ($format === 'jpeg') {
-            $img = ffk_gd_flatten($img); // JPEG kennt keine Transparenz
-            $ok = imagejpeg($img, $dest, FFK_IMAGE_WEBP_QUALITY);
-        } else {
-            imagealphablending($img, false);
-            imagesavealpha($img, true);
-            $ok = $format === 'png'
-                ? imagepng($img, $dest, 6)
-                : imagewebp($img, $dest, FFK_IMAGE_WEBP_QUALITY);
-        }
-        if (!$ok) {
-            throw new FfkImageException('Schreiben der Bilddatei lieferte false');
-        }
-    } finally {
-        if ($img instanceof GdImage) {
-            imagedestroy($img);
-        }
+    $img = ffk_gd_apply_exif_rotation($img, $src, $imageType);
+    $img = ffk_gd_resize_within($img, FFK_IMAGE_MAX_EDGE);
+
+    if ($format === 'jpeg') {
+        $img = ffk_gd_flatten($img); // JPEG kennt keine Transparenz
+        $ok = imagejpeg($img, $dest, FFK_IMAGE_WEBP_QUALITY);
+    } else {
+        imagealphablending($img, false);
+        imagesavealpha($img, true);
+        $ok = $format === 'png'
+            ? imagepng($img, $dest, 6)
+            : imagewebp($img, $dest, FFK_IMAGE_WEBP_QUALITY);
+    }
+    if (!$ok) {
+        throw new FfkImageException('Schreiben der Bilddatei lieferte false');
     }
 }
 
@@ -358,7 +403,6 @@ function ffk_gd_apply_exif_rotation(GdImage $img, string $src, int $imageType): 
     if ($angle !== 0) {
         $rotated = imagerotate($img, $angle, 0);
         if ($rotated instanceof GdImage) {
-            imagedestroy($img);
             $img = $rotated;
         }
     }
@@ -374,7 +418,6 @@ function ffk_gd_flatten(GdImage $img): GdImage
     imagefilledrectangle($flat, 0, 0, $w, $h, imagecolorallocate($flat, 255, 255, 255));
     imagealphablending($flat, true);
     imagecopy($flat, $img, 0, 0, 0, 0, $w, $h);
-    imagedestroy($img);
     return $flat;
 }
 
@@ -396,7 +439,6 @@ function ffk_gd_resize_within(GdImage $img, int $maxEdge): GdImage
     $transparent = imagecolorallocatealpha($dst, 0, 0, 0, 127);
     imagefilledrectangle($dst, 0, 0, $newW, $newH, $transparent);
     imagecopyresampled($dst, $img, 0, 0, 0, 0, $newW, $newH, $w, $h);
-    imagedestroy($img);
     return $dst;
 }
 
@@ -414,8 +456,7 @@ function ffk_make_thumb(string $src, string $dest, int $maxWidth = 1280, int $qu
     if (ffk_has_imagick()) {
         try {
             $im = new Imagick($src);
-            $im->autoOrientImage();
-            $im->setImageOrientation(Imagick::ORIENTATION_TOPLEFT);
+            ffk_imagick_auto_orient($im);
             if ($im->getImageWidth() > $maxWidth) {
                 $im->resizeImage($maxWidth, 0, Imagick::FILTER_LANCZOS, 1);
             }
@@ -452,23 +493,17 @@ function ffk_make_thumb(string $src, string $dest, int $maxWidth = 1280, int $qu
             $dst = imagecreatetruecolor($newW, $newH);
             imagefilledrectangle($dst, 0, 0, $newW, $newH, imagecolorallocate($dst, 255, 255, 255));
             imagecopyresampled($dst, $img, 0, 0, 0, 0, $newW, $newH, $w, $h);
-            imagedestroy($img);
             $img = $dst;
         } else {
             // Transparenz für JPEG auf Weiß legen
             $flat = imagecreatetruecolor($w, $h);
             imagefilledrectangle($flat, 0, 0, $w, $h, imagecolorallocate($flat, 255, 255, 255));
             imagecopy($flat, $img, 0, 0, 0, 0, $w, $h);
-            imagedestroy($img);
             $img = $flat;
         }
         return imagejpeg($img, $dest, $quality);
     } catch (Throwable $e) {
         error_log('[FFK] Vorschaubild (GD) fehlgeschlagen: ' . $e->getMessage());
         return false;
-    } finally {
-        if ($img instanceof GdImage) {
-            imagedestroy($img);
-        }
     }
 }

@@ -100,6 +100,15 @@ set_error_handler(static function (int $severity, string $message, string $file 
     if (!(error_reporting() & $severity)) {
         return false; // per @ unterdrückt oder ausgeblendet
     }
+    // Veraltungshinweise dürfen den Ablauf NIE unterbrechen. Sie sagen nur,
+    // dass eine Funktion in einer künftigen PHP-Fassung wegfällt – die
+    // Anwendung funktioniert weiterhin. Würden sie wie Fehler behandelt,
+    // bräche eine neue PHP-Version schlagartig Funktionen ab (so geschehen
+    // mit imagedestroy() unter PHP 8.5 beim Hochladen von Bildern).
+    if ($severity === E_DEPRECATED || $severity === E_USER_DEPRECATED) {
+        error_log('[FFK] Veraltungshinweis: ' . $message . ' @ ' . $file . ':' . $line);
+        return true; // erledigt, kein Abbruch
+    }
     throw new ErrorException($message, 0, $severity, $file, $line);
 });
 

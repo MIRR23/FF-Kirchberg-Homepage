@@ -56,7 +56,6 @@ for ($y = 0; $y < 1600; $y += 8) {
     }
 }
 imagejpeg($im, $src, 90);
-imagedestroy($im);
 @exec('exiftool -overwrite_original -q -GPSLatitude=48.3 -GPSLatitudeRef=N '
     . '-Make=TestPhone -Artist=Vertraulich -Orientation#=6 ' . escapeshellarg($src));
 pruefe('Testfoto angelegt', is_file($src) && filesize($src) > 0);
@@ -125,7 +124,6 @@ if ($can[$engine]['jpeg']) {
     imagesavealpha($t, true);
     imagefill($t, 0, 0, imagecolorallocatealpha($t, 0, 0, 0, 127));
     imagepng($t, $png);
-    imagedestroy($t);
     $dest = "$tmp/flach.jpg";
     $fehler2 = null;
     try {
@@ -175,6 +173,47 @@ pruefe('Textdatei mit .jpg wird abgelehnt', $meldung !== null, (string) $meldung
 $gif = "$tmp/anim.gif";
 imagegif(imagecreatetruecolor(60, 40), $gif);
 pruefe('GIF bleibt unverändert (Animation)', ffk_optimize_image($gif, 'image/gif') === $gif);
+
+// ---------------------------------------------------------------------------
+// Neue PHP-Fassungen dürfen den Upload nicht lahmlegen
+//
+// PHP 8.5 meldet imagedestroy() als veraltet. Solange solche Hinweise wie
+// Fehler behandelt wurden, brach der Bild-Upload auf einem frisch
+// aktualisierten Server komplett ab. Der Test hält das dauerhaft fest.
+echo "\n▶ Veraltungshinweise legen nichts lahm\n";
+
+$altesLog = ini_get('error_log');
+ini_set('error_log', "$tmp/hinweise.log"); // Protokoll aus der Testausgabe halten
+$abbruch = null;
+try {
+    trigger_error('nur ein Hinweis', E_USER_DEPRECATED);
+} catch (Throwable $e) {
+    $abbruch = $e->getMessage();
+}
+pruefe('Veraltungshinweis bricht nicht ab', $abbruch === null, (string) $abbruch);
+pruefe(
+    'Veraltungshinweis steht im Server-Protokoll',
+    str_contains((string) @file_get_contents("$tmp/hinweise.log"), 'nur ein Hinweis')
+);
+ini_set('error_log', $altesLog === false ? '' : $altesLog);
+
+$abbruch = null;
+try {
+    trigger_error('echter Fehler', E_USER_WARNING);
+} catch (Throwable $e) {
+    $abbruch = $e->getMessage();
+}
+pruefe('echte Warnung bricht weiterhin ab', $abbruch !== null);
+
+// Imagick-Fassungen vor 3.3 kennen autoOrientImage() nicht. Der Aufruf läuft
+// deshalb über eine Hilfsfunktion, die die Drehung notfalls selbst erledigt.
+$imagesQuelle = file_get_contents(FFK_ROOT . '/php/images.php') ?: '';
+pruefe('EXIF-Drehung über eigene Hilfsfunktion', function_exists('ffk_imagick_auto_orient'));
+pruefe(
+    'autoOrientImage() nur einmal, in der abgesicherten Hilfsfunktion',
+    substr_count($imagesQuelle, '->autoOrientImage()') === 1
+    && str_contains($imagesQuelle, "method_exists(\$im, 'autoOrientImage')")
+);
 
 // ---------------------------------------------------------------------------
 array_map('unlink', glob("$tmp/*") ?: []);
