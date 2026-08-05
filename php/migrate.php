@@ -72,9 +72,9 @@ function ffk_ensure_installed(): void
                 return; // Erstbefüllung abgeschaltet – Flag bewusst nicht setzen
             }
             try {
-                // Beim erzwungenen Neu-Einlesen bleiben die Benutzerkonten
-                // erhalten, damit geänderte Passwörter nicht verloren gehen.
-                ffk_run_migration($forced);
+                // Die Befüllung ergänzt ausschließlich fehlende Einträge –
+                // gepflegte Inhalte und Konten bleiben in jedem Fall erhalten.
+                ffk_run_migration();
             } catch (FfkIncompleteMediaException $e) {
                 // Kein Flag setzen: Sobald der Upload vollständig ist, läuft
                 // die Einrichtung beim nächsten Aufruf von selbst weiter.
@@ -317,13 +317,19 @@ function ffk_migration_make_thumb(?string $localUrl): ?string
 }
 
 /**
- * Führt die vollständige Erstbefüllung aus.
+ * Führt die Erstbefüllung aus.
+ *
+ * Die Befüllung ist **rein ergänzend**: Sie legt ausschließlich Einträge an,
+ * die es noch nicht gibt, und fasst vorhandene niemals an. Gepflegte
+ * Mitglieder, Fahrzeuge, Seitentexte, Termine, Benutzer und selbst verfasste
+ * Beiträge bleiben also auch dann erhalten, wenn die Befüllung ein zweites
+ * Mal läuft. Auf einer leeren Datenbank ist das Ergebnis dasselbe wie zuvor.
  *
  * Anders als in der Node-Fassung werden keine fehlenden Dateien von der alten
  * Website nachgeladen: Alle benötigten Bilder liegen im Paket (uploads/wp/),
  * und der Zielserver soll beim Einrichten keine Verbindung nach außen brauchen.
  */
-function ffk_run_migration(bool $keepUsers = false): void
+function ffk_run_migration(): void
 {
     @set_time_limit(0);
     @ini_set('memory_limit', '512M');
@@ -348,18 +354,9 @@ function ffk_run_migration(bool $keepUsers = false): void
         ));
     }
 
-    // ---------- Tabellen leeren ----------
-    $tables = ['posts', 'categories', 'events', 'vehicles', 'members', 'pages', 'media'];
-    if (!$keepUsers) {
-        $tables[] = 'users';
-    }
-    foreach ($tables as $table) {
-        ffk_exec("DELETE FROM `$table`");
-    }
-
     // ---------- Benutzer ----------
-    // Beim erneuten Einlesen bleiben bestehende Konten (und damit geänderte
-    // Passwörter) erhalten – neu angelegt wird nur, wenn es noch keine gibt.
+    // Bestehende Konten (und damit geänderte Passwörter) bleiben erhalten –
+    // angelegt wird nur, wenn es noch gar keine gibt.
     if (ffk_count_users() === 0) {
         ffk_create_user([
             'username' => 'admin',
@@ -388,9 +385,15 @@ function ffk_run_migration(bool $keepUsers = false): void
         'pressemeldungen' => ['color' => 'green', 'isEinsatz' => 0],
         'allgemein' => ['color' => 'gray', 'isEinsatz' => 0],
     ];
-    $catMap = []; // WP-ID -> neue ID
+    $catMap = []; // WP-ID -> ID in dieser Datenbank
     foreach ($wpCats as $c) {
         $slug = (string) ($c['slug'] ?? '');
+        // Bereits vorhandene Kategorie unverändert weiterverwenden
+        $existing = ffk_get_category_by_slug($slug);
+        if ($existing !== null) {
+            $catMap[(int) ($c['id'] ?? 0)] = $existing['id'];
+            continue;
+        }
         $cfg = $catConfig[$slug] ?? ['color' => 'gray', 'isEinsatz' => 0];
         $created = ffk_create_category([
             'name' => ffk_decode_entities((string) ($c['name'] ?? '')),
@@ -422,6 +425,11 @@ function ffk_run_migration(bool $keepUsers = false): void
 
     $postCount = 0;
     foreach ($wpPosts as $p) {
+        // Vorhandene Beiträge nie überschreiben – auch nicht nachträglich
+        // bearbeitete. Der Slug ist dauerhaft und eindeutig.
+        if (ffk_get_post_by_slug((string) ($p['slug'] ?? '')) !== null) {
+            continue;
+        }
         $content = ffk_migration_process_content($index, $p['content']['rendered'] ?? '');
 
         // Nur lokale (erfolgreich migrierte) Bilder als Titelbild verwenden
@@ -491,6 +499,9 @@ function ffk_run_migration(bool $keepUsers = false): void
         ['slug' => 'links', 'title' => 'Links', 'wpSlug' => 'links'],
     ];
     foreach ($pageDefs as $def) {
+        if (ffk_get_page_by_slug($def['slug']) !== null) {
+            continue; // gepflegter Seitentext bleibt unangetastet
+        }
         $wp = isset($def['wpSlug']) ? ($bySlug[$def['wpSlug']] ?? null) : null;
         $title = $def['title'];
         if ($wp !== null) {
@@ -515,7 +526,9 @@ function ffk_run_migration(bool $keepUsers = false): void
         ['wpSlug' => 'mzf', 'name' => 'MZF', 'type' => 'Mehrzweckfahrzeug', 'sort' => 2],
         ['wpSlug' => 'tsf-8', 'name' => 'TSF 8', 'type' => 'Tragkraftspritzenfahrzeug', 'sort' => 3],
     ];
-    foreach ($vehicleDefs as $v) {
+    // Beispiel- und Startdaten nur anlegen, solange die Liste leer ist –
+    // gepflegte Einträge dürfen nie ersetzt oder verdoppelt werden.
+    foreach (ffk_list_vehicles() === [] ? $vehicleDefs : [] as $v) {
         $wp = $bySlug[$v['wpSlug']] ?? null;
         $content = $wp !== null ? ffk_migration_process_content($index, $wp['content']['rendered'] ?? '') : '';
         $firstImg = null;
@@ -542,7 +555,7 @@ function ffk_run_migration(bool $keepUsers = false): void
         ['name' => 'Thomas Beispiel', 'funktion' => 'Maschinist', 'gruppe' => 'aktive', 'sortOrder' => 2],
         ['name' => 'Lisa Beispiel', 'funktion' => 'Gruppenführerin', 'gruppe' => 'aktive', 'sortOrder' => 3],
     ];
-    foreach ($sampleMembers as $m) {
+    foreach (ffk_list_members() === [] ? $sampleMembers : [] as $m) {
         ffk_create_member($m + ['image' => null]);
     }
 
@@ -552,15 +565,21 @@ function ffk_run_migration(bool $keepUsers = false): void
         ['title' => 'Monatsübung', 'date' => '2026-08-07', 'time' => '19:00', 'location' => 'Gerätehaus Kirchberg', 'description' => 'Beispieltermin – bitte im internen Bereich anpassen.', 'kind' => 'uebung'],
         ['title' => 'Christbaumversteigerung 2027', 'date' => '2027-01-09', 'time' => '19:30', 'location' => 'Gasthaus Müller, Schröding', 'description' => 'Beispieltermin – bitte im internen Bereich anpassen.', 'kind' => 'veranstaltung'],
     ];
-    foreach ($sampleEvents as $e) {
+    foreach (ffk_list_events() === [] ? $sampleEvents : [] as $e) {
         ffk_create_event($e);
     }
 
     // ---------- Mediathek ----------
+    // Bereits eingetragene Bilder überspringen, damit die Mediathek beim
+    // erneuten Einlesen keine Dubletten bekommt.
+    $bekannteBilder = [];
+    foreach (ffk_list_media() as $vorhanden) {
+        $bekannteBilder[$vorhanden['url']] = true;
+    }
     $mediaCount = 0;
     foreach ($wpMedia as $m) {
         $url = $index->byId[(int) ($m['id'] ?? 0)] ?? null;
-        if ($url === null) {
+        if ($url === null || isset($bekannteBilder[$url])) {
             continue;
         }
         ffk_create_media([

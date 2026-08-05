@@ -33,12 +33,12 @@ return [
     // Aufruf. Nach der Ersteinrichtung kann das ruhig aktiviert bleiben – es
     // passiert nur etwas, solange noch kein einziger Benutzer existiert.
     //
-    // INHALTE NEU EINLESEN (z. B. wenn beim ersten Aufruf noch nicht alle
-    // Bilder hochgeladen waren): hier statt true das Wort 'neu' eintragen und
-    // die Website einmal aufrufen. Beiträge, Seiten, Fahrzeuge und Mediathek
-    // werden dann frisch aus migration-data/ aufgebaut; Benutzerkonten und
-    // hochgeladene Dateien bleiben erhalten. Der Wert darf anschließend
-    // stehen bleiben – erst ein anderes Wort ('neu2', 'neu3' …) liest erneut ein.
+    // FEHLENDE INHALTE NACHTRAGEN: hier statt true das Wort 'neu' eintragen
+    // und die Website einmal aufrufen. Die Befüllung ergänzt dann alles, was
+    // in der Datenbank fehlt. Sie ist rein ergänzend und überschreibt nichts –
+    // gepflegte Mitglieder, Fahrzeuge, Seiten, Termine, Benutzer und eigene
+    // Beiträge bleiben unangetastet. Der Wert darf anschließend stehen
+    // bleiben; erst ein anderes Wort ('neu2', 'neu3' …) trägt erneut nach.
     'auto_migrate' => true,
 
     // Normalerweise bricht die Erstbefüllung ab, solange in uploads/ noch
