@@ -41,10 +41,11 @@ final class FfkImageException extends RuntimeException
 }
 
 /**
- * Was kann dieser Server? Wird für die Formatwahl und für verständliche
- * Fehlermeldungen gebraucht.
+ * Was kann dieser Server? Ermittelt für **beide** Bibliotheken getrennt, was
+ * sie schreiben können – eine kaputt konfigurierte Imagick-Installation darf
+ * nicht dazu führen, dass gar nichts mehr geht.
  *
- * @return array{engine:string,webp:bool,jpeg:bool,png:bool}
+ * @return array{engines:list<string>,imagick:array{webp:bool,jpeg:bool,png:bool},gd:array{webp:bool,jpeg:bool,png:bool}}
  */
 function ffk_image_capabilities(): array
 {
@@ -53,62 +54,65 @@ function ffk_image_capabilities(): array
         return $cache;
     }
 
+    $engines = [];
+    $imagick = ['webp' => false, 'jpeg' => false, 'png' => false];
+    $gd = ['webp' => false, 'jpeg' => false, 'png' => false];
+
     if (ffk_has_imagick()) {
-        $formate = [];
+        $engines[] = 'imagick';
         try {
             $formate = array_map('strtoupper', Imagick::queryFormats());
+            $imagick = [
+                'webp' => in_array('WEBP', $formate, true),
+                'jpeg' => in_array('JPEG', $formate, true),
+                'png' => in_array('PNG', $formate, true),
+            ];
         } catch (Throwable) {
-            $formate = [];
+            // Formate nicht abfragbar – trotzdem versuchen, es kann klappen
+            $imagick = ['webp' => true, 'jpeg' => true, 'png' => true];
         }
-        $cache = [
-            'engine' => 'imagick',
-            'webp' => in_array('WEBP', $formate, true),
-            'jpeg' => in_array('JPEG', $formate, true),
-            'png' => in_array('PNG', $formate, true),
-        ];
-        return $cache;
     }
 
     if (ffk_has_gd()) {
+        $engines[] = 'gd';
         $info = function_exists('gd_info') ? gd_info() : [];
-        $cache = [
-            'engine' => 'gd',
+        $gd = [
             'webp' => function_exists('imagewebp') && !empty($info['WebP Support']),
             'jpeg' => function_exists('imagejpeg') && !empty($info['JPEG Support']),
             'png' => function_exists('imagepng') && !empty($info['PNG Support']),
         ];
-        return $cache;
     }
 
-    $cache = ['engine' => 'keine', 'webp' => false, 'jpeg' => false, 'png' => false];
+    $cache = ['engines' => $engines, 'imagick' => $imagick, 'gd' => $gd];
     return $cache;
 }
 
-/**
- * Wählt das Ausgabeformat: bevorzugt WebP (deutlich kleiner). Kann der Server
- * kein WebP – bei manchen Hostern ist GD ohne WebP übersetzt –, wird JPEG
- * bzw. bei Transparenz PNG genutzt. Ein fehlendes WebP darf nie dazu führen,
- * dass sich überhaupt keine Fotos hochladen lassen.
- */
-function ffk_image_target_format(bool $brauchtTransparenz): string
+/** Kurzfassung der Server-Fähigkeiten für Fehlermeldungen und Diagnose. */
+function ffk_image_capabilities_text(): string
 {
     $can = ffk_image_capabilities();
-    if ($can['webp']) {
-        return 'webp';
+    if ($can['engines'] === []) {
+        return 'keine Bildbearbeitung installiert';
     }
-    if ($brauchtTransparenz && $can['png']) {
-        return 'png';
+    $teile = [];
+    foreach ($can['engines'] as $engine) {
+        $formate = array_keys(array_filter($can[$engine]));
+        $teile[] = $engine . ': ' . ($formate === [] ? 'kein Ausgabeformat' : implode('/', $formate));
     }
-    if ($can['jpeg']) {
-        return 'jpeg';
-    }
-    if ($can['png']) {
-        return 'png';
-    }
-    throw new FfkImageException(
-        'Der Server kann keine Bilder umwandeln. Bitte beim Hoster die PHP-Erweiterung '
-        . '„gd" (oder „imagick") mit JPEG-Unterstützung aktivieren lassen.'
-    );
+    return implode(', ', $teile);
+}
+
+/**
+ * Formate, die für dieses Bild in Frage kommen – in Wunschreihenfolge.
+ * WebP ist am kleinsten; ohne WebP tut es JPEG, bei Transparenz PNG.
+ *
+ * @return list<string>
+ */
+function ffk_image_target_formats(string $engine, bool $brauchtTransparenz): array
+{
+    $can = ffk_image_capabilities()[$engine];
+    $wunsch = $brauchtTransparenz ? ['webp', 'png', 'jpeg'] : ['webp', 'jpeg', 'png'];
+    return array_values(array_filter($wunsch, static fn (string $f) => $can[$f]));
 }
 
 /**
@@ -138,8 +142,8 @@ function ffk_check_memory_for_image(int $breite, int $hoehe): void
     $megapixel = round($breite * $hoehe / 1000000, 1);
     throw new FfkImageException(sprintf(
         'Das Bild ist mit %s Megapixeln zu groß für den eingestellten Arbeitsspeicher '
-        . '(memory_limit = %s). Bitte memory_limit in den PHP-Einstellungen auf mindestens '
-        . '256M erhöhen – oder das Foto vorher verkleinern.',
+        . '(memory_limit = %s). Bitte memory_limit in den PHP-Einstellungen erhöhen '
+        . '– oder das Foto vorher verkleinern.',
         str_replace('.', ',', (string) $megapixel),
         (string) ini_get('memory_limit')
     ));
@@ -147,6 +151,10 @@ function ffk_check_memory_for_image(int $breite, int $hoehe): void
 
 /**
  * Optimiert ein Bild an Ort und Stelle.
+ *
+ * Probiert der Reihe nach jede vorhandene Bibliothek und jedes mögliche
+ * Ausgabeformat. Erst wenn nichts davon funktioniert, wird abgebrochen – und
+ * zwar mit den gesammelten Gründen, nicht mit einer Vermutung.
  *
  * @return string Neuer Dateipfad. Bei GIFs bleibt der Pfad unverändert.
  * @throws FfkImageException mit einer verständlichen deutschen Begründung
@@ -164,63 +172,90 @@ function ffk_optimize_image(string $path, string $mimeType): string
     }
 
     $can = ffk_image_capabilities();
-    if ($can['engine'] === 'keine') {
+    if ($can['engines'] === []) {
         throw new FfkImageException(
             'Auf dem Server fehlt die Bildbearbeitung. Bitte beim Hoster die PHP-Erweiterung '
             . '„gd" (oder „imagick") aktivieren lassen.'
         );
     }
 
-    // GD entpackt das Bild vollständig in den Arbeitsspeicher. Reicht der nicht,
-    // bricht PHP hart ab (nicht abfangbar) und der Redakteur sieht nur einen
-    // Serverfehler. Deshalb vorher rechnen und verständlich melden.
-    if ($can['engine'] === 'gd') {
-        ffk_check_memory_for_image((int) $info[0], (int) $info[1]);
-    }
-
     // PNG, WebP und AVIF können durchsichtige Bereiche enthalten
     $mitTransparenz = in_array($info[2], [IMAGETYPE_PNG, IMAGETYPE_WEBP, IMAGETYPE_AVIF], true);
-    $format = ffk_image_target_format($mitTransparenz);
-    $endung = $format === 'jpeg' ? 'jpg' : $format;
 
-    $target = preg_replace('/\.[a-z0-9]+$/i', '', $path) . '.' . $endung;
-    if ($target === $path) {
-        $target .= '.' . $endung;
+    $gruende = [];
+    foreach ($can['engines'] as $engine) {
+        // GD entpackt das Bild vollständig in den Arbeitsspeicher. Reicht der
+        // nicht, bricht PHP hart ab (nicht abfangbar) – deshalb vorher rechnen.
+        if ($engine === 'gd') {
+            try {
+                ffk_check_memory_for_image((int) $info[0], (int) $info[1]);
+            } catch (FfkImageException $e) {
+                $gruende[] = 'gd: ' . $e->getMessage();
+                continue;
+            }
+        }
+
+        foreach (ffk_image_target_formats($engine, $mitTransparenz) as $format) {
+            $endung = $format === 'jpeg' ? 'jpg' : $format;
+            $tmp = $path . '.tmp.' . $endung;
+            @unlink($tmp);
+            try {
+                if ($engine === 'imagick') {
+                    ffk_optimize_with_imagick($path, $tmp, $format);
+                } else {
+                    ffk_optimize_with_gd($path, $tmp, (int) $info[2], $format);
+                }
+            } catch (Throwable $e) {
+                @unlink($tmp);
+                $gruende[] = "$engine/$format: " . $e->getMessage();
+                continue;
+            }
+            if (!is_file($tmp) || filesize($tmp) === 0) {
+                @unlink($tmp);
+                $gruende[] = "$engine/$format: leere Datei geschrieben";
+                continue;
+            }
+
+            $target = preg_replace('/\.[a-z0-9]+$/i', '', $path) . '.' . $endung;
+            if ($target === $path) {
+                $target .= '.' . $endung;
+            }
+            @unlink($path);
+            if (!@rename($tmp, $target)) {
+                @unlink($tmp);
+                throw new FfkImageException(
+                    'Das fertige Bild konnte nicht gespeichert werden – bitte die Schreibrechte '
+                    . 'im Ordner uploads/ prüfen.'
+                );
+            }
+            return $target;
+        }
     }
-    $tmp = $path . '.tmp.' . $endung;
 
-    $ok = $can['engine'] === 'imagick'
-        ? ffk_optimize_with_imagick($path, $tmp, $format)
-        : ffk_optimize_with_gd($path, $tmp, $info[2], $format);
-
-    if (!$ok || !is_file($tmp) || filesize($tmp) === 0) {
-        @unlink($tmp);
-        throw new FfkImageException(
-            'Das Bild konnte nicht umgewandelt werden. Häufigste Ursache: zu wenig Arbeitsspeicher '
-            . '(memory_limit) für ein sehr großes Foto.'
-        );
-    }
-
-    @unlink($path);
-    if (!@rename($tmp, $target)) {
-        @unlink($tmp);
-        throw new FfkImageException('Das fertige Bild konnte nicht gespeichert werden (Schreibrechte im Ordner uploads/ prüfen).');
-    }
-    return $target;
+    // Nichts hat funktioniert: die echten Gründe nennen, damit sie behebbar sind.
+    error_log('[FFK] Bildumwandlung fehlgeschlagen – ' . implode(' | ', $gruende));
+    throw new FfkImageException(
+        'Das Bild konnte nicht umgewandelt werden. Technische Angaben zum Weitergeben: '
+        . implode(' | ', array_slice($gruende, 0, 4))
+        . ' [Server: ' . ffk_image_capabilities_text() . ']'
+    );
 }
 
-/** Variante mit Imagick. */
-function ffk_optimize_with_imagick(string $src, string $dest, string $format = 'webp'): bool
+/**
+ * Variante mit Imagick.
+ *
+ * @throws Throwable mit der Originalmeldung – manche Hoster schränken Imagick
+ *                   per policy.xml ein; diese Meldung soll sichtbar bleiben.
+ */
+function ffk_optimize_with_imagick(string $src, string $dest, string $format): void
 {
+    $im = new Imagick($src);
     try {
-        $im = new Imagick($src);
         // EXIF-Drehung ins Bild übernehmen und Orientierungs-Flag zurücksetzen
         $im->autoOrientImage();
         $im->setImageOrientation(Imagick::ORIENTATION_TOPLEFT);
 
-        $w = $im->getImageWidth();
-        $h = $im->getImageHeight();
-        if ($w > FFK_IMAGE_MAX_EDGE || $h > FFK_IMAGE_MAX_EDGE) {
+        if ($im->getImageWidth() > FFK_IMAGE_MAX_EDGE || $im->getImageHeight() > FFK_IMAGE_MAX_EDGE) {
             // bestfit=true begrenzt beide Kanten, ohne das Seitenverhältnis zu ändern
             $im->resizeImage(FFK_IMAGE_MAX_EDGE, FFK_IMAGE_MAX_EDGE, Imagick::FILTER_LANCZOS, 1, true);
         }
@@ -231,42 +266,48 @@ function ffk_optimize_with_imagick(string $src, string $dest, string $format = '
         if ($format === 'jpeg') {
             // Transparenz würde im JPEG schwarz – deshalb auf Weiß legen
             $im->setImageBackgroundColor(new ImagickPixel('white'));
-            $im = $im->flattenImages();
+            $flach = $im->flattenImages();
+            $im->clear();
+            $im = $flach;
         }
         $im->setImageFormat($format);
         $im->setImageCompressionQuality(FFK_IMAGE_WEBP_QUALITY);
-        $im->writeImage($dest);
+        if (!$im->writeImage($dest)) {
+            throw new FfkImageException('writeImage lieferte false');
+        }
+    } finally {
         $im->clear();
-        $im->destroy();
-        return true;
-    } catch (Throwable $e) {
-        error_log('[FFK] Imagick-Verarbeitung fehlgeschlagen: ' . $e->getMessage());
-        return false;
     }
 }
 
-/** Variante mit GD (Fallback). GD schreibt grundsätzlich keine Metadaten mit. */
-function ffk_optimize_with_gd(string $src, string $dest, int $imageType, string $format = 'webp'): bool
+/**
+ * Variante mit GD. GD schreibt grundsätzlich keine Metadaten mit.
+ *
+ * @throws FfkImageException mit dem konkreten Grund
+ */
+function ffk_optimize_with_gd(string $src, string $dest, int $imageType, string $format): void
 {
     $img = ffk_gd_load($src, $imageType);
     if ($img === null) {
-        return false;
+        throw new FfkImageException('Bildtyp kann von GD nicht gelesen werden');
     }
     try {
         $img = ffk_gd_apply_exif_rotation($img, $src, $imageType);
         $img = ffk_gd_resize_within($img, FFK_IMAGE_MAX_EDGE);
+
         if ($format === 'jpeg') {
             $img = ffk_gd_flatten($img); // JPEG kennt keine Transparenz
-            return imagejpeg($img, $dest, FFK_IMAGE_WEBP_QUALITY);
+            $ok = imagejpeg($img, $dest, FFK_IMAGE_WEBP_QUALITY);
+        } else {
+            imagealphablending($img, false);
+            imagesavealpha($img, true);
+            $ok = $format === 'png'
+                ? imagepng($img, $dest, 6)
+                : imagewebp($img, $dest, FFK_IMAGE_WEBP_QUALITY);
         }
-        imagealphablending($img, false);
-        imagesavealpha($img, true);
-        return $format === 'png'
-            ? imagepng($img, $dest, 6)
-            : imagewebp($img, $dest, FFK_IMAGE_WEBP_QUALITY);
-    } catch (Throwable $e) {
-        error_log('[FFK] GD-Verarbeitung fehlgeschlagen: ' . $e->getMessage());
-        return false;
+        if (!$ok) {
+            throw new FfkImageException('Schreiben der Bilddatei lieferte false');
+        }
     } finally {
         if ($img instanceof GdImage) {
             imagedestroy($img);
