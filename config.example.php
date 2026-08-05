@@ -32,5 +32,18 @@ return [
     // Automatische Erstbefüllung der Datenbank aus migration-data/ beim ersten
     // Aufruf. Nach der Ersteinrichtung kann das ruhig aktiviert bleiben – es
     // passiert nur etwas, solange noch kein einziger Benutzer existiert.
+    //
+    // INHALTE NEU EINLESEN (z. B. wenn beim ersten Aufruf noch nicht alle
+    // Bilder hochgeladen waren): hier statt true das Wort 'neu' eintragen und
+    // die Website einmal aufrufen. Beiträge, Seiten, Fahrzeuge und Mediathek
+    // werden dann frisch aus migration-data/ aufgebaut; Benutzerkonten und
+    // hochgeladene Dateien bleiben erhalten. Der Wert darf anschließend
+    // stehen bleiben – erst ein anderes Wort ('neu2', 'neu3' …) liest erneut ein.
     'auto_migrate' => true,
+
+    // Normalerweise bricht die Erstbefüllung ab, solange in uploads/ noch
+    // Bilder fehlen – sonst wären sie danach dauerhaft aus den Beiträgen
+    // verschwunden. Nur auf true setzen, wenn einzelne Bilder bewusst fehlen
+    // und die Einrichtung trotzdem laufen soll.
+    'allow_incomplete_media' => false,
 ];
