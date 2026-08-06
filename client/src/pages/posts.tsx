@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ArrowLeft, MapPin, User } from "lucide-react";
 import type { Post } from "@shared/schema";
 import { cleanHtml } from "@/lib/sanitize";
-import { ImageGallery } from "@/components/gallery";
+import { ImageGallery, LeadImage } from "@/components/gallery";
 import { LocationView } from "@/components/map";
 import { usePageTitle } from "@/lib/seo";
 import { formatDateLong, formatTime, yearOf } from "@/lib/format";
@@ -230,12 +230,19 @@ export function PostDetail() {
               {post.ort && <span className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" />{post.ort}</span>}
               {post.authorName && <span className="flex items-center gap-1.5"><User className="h-3.5 w-3.5" />{post.authorName}</span>}
             </div>
+            <LeadImage image={post.featuredImage} title={post.title} />
             <div
               className="prose-content mt-8"
               data-testid="text-post-content"
               dangerouslySetInnerHTML={{ __html: cleanHtml(post.content, { linksNewTab: site?.linksNewTab }) }}
             />
-            <ImageGallery images={post.images} title={post.title} heading="Bilder" />
+            {/* Das Hauptbild steht schon oben – in der Galerie wäre es doppelt. */}
+            <ImageGallery
+              images={post.images}
+              title={post.title}
+              heading="Bilder"
+              exclude={post.featuredImage}
+            />
             <LocationView lat={post.lat} lng={post.lng} label={post.ort} heading="Standort" />
           </>
         )}

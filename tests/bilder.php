@@ -170,6 +170,30 @@ try {
 }
 pruefe('Textdatei mit .jpg wird abgelehnt', $meldung !== null, (string) $meldung);
 
+// Handy-Fotos vom iPhone kommen als HEIC an. „keine Bilddatei" hilft niemandem
+// weiter – die Meldung muss sagen, was am Gerät umzustellen ist.
+$heic = "$tmp/foto.heic";
+file_put_contents($heic, "\0\0\0\x18ftypheic\0\0\0\0heicmif1" . str_repeat("\0", 32));
+pruefe(
+    'HEIC wird als iPhone-Format erkannt',
+    str_contains(ffk_describe_unreadable_image($heic), 'HEIC')
+);
+pruefe(
+    'HEIC-Meldung sagt, was zu tun ist',
+    str_contains(ffk_describe_unreadable_image($heic), 'Maximale Kompatibilität')
+);
+
+$pdf = "$tmp/handbuch.pdf";
+file_put_contents($pdf, "%PDF-1.7\n%\xE2\xE3\xCF\xD3\n");
+pruefe('PDF wird als Dokument erkannt', str_contains(ffk_describe_unreadable_image($pdf), 'PDF'));
+
+$text = "$tmp/notiz.jpg";
+file_put_contents($text, 'nur Text');
+pruefe(
+    'unbekannter Inhalt bekommt die allgemeine Meldung',
+    str_contains(ffk_describe_unreadable_image($text), 'keine Bilddatei')
+);
+
 $gif = "$tmp/anim.gif";
 imagegif(imagecreatetruecolor(60, 40), $gif);
 pruefe('GIF bleibt unverändert (Animation)', ffk_optimize_image($gif, 'image/gif') === $gif);

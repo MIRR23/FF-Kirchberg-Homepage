@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
 import type { SafeUser, PermissionArea } from "@shared/schema";
+import { shrinkAllForUpload } from "@/lib/image";
 
 // ---------------------------------------------------------------------------
 // Adressbildung für das PHP-Backend
@@ -212,19 +213,55 @@ export async function authRequest(
   return res;
 }
 
+/**
+ * Baut aus einer fehlgeschlagenen Antwort eine Meldung, die weiterhilft.
+ *
+ * Antwortet der Webserver selbst – etwa weil die Anfrage zu groß war –, ist
+ * die Antwort kein JSON und enthält keine deutsche Meldung. Ohne diesen Weg
+ * sähe man nur „Upload fehlgeschlagen" und wüsste nicht, woran es lag.
+ */
+export async function errorMessage(res: Response, fallback: string): Promise<string> {
+  const text = await res.text().catch(() => "");
+  try {
+    const body = JSON.parse(text);
+    if (body?.message) return String(body.message);
+  } catch {
+    // keine JSON-Antwort – unten steht, was wir stattdessen sagen können
+  }
+  if (res.status === 413) {
+    return "Die Datei ist zu groß für den Server. Bitte ein kleineres Bild wählen "
+      + "oder beim Hoster upload_max_filesize und post_max_size erhöhen lassen.";
+  }
+  if (res.status === 401 || res.status === 403) {
+    return "Die Anmeldung ist abgelaufen. Bitte neu anmelden.";
+  }
+  return `${fallback} (Antwort des Servers: ${res.status})`;
+}
+
 /** Authentifizierter Datei-Upload (FormData). */
 export async function uploadFiles(token: string | null, files: FileList | File[]): Promise<any[]> {
+  // Große Handy-Fotos vorher verkleinern: Der Server begrenzt ohnehin auf
+  // 1600 px, und übergroße Anfragen scheitern bei manchen Hostern schon,
+  // bevor PHP sie sieht.
+  const vorbereitet = await shrinkAllForUpload(files);
+
   const fd = new FormData();
   // PHP fasst gleichnamige Felder nur mit "[]" zu einer Liste zusammen
-  Array.from(files).forEach((f) => fd.append("files[]", f));
-  const res = await apiFetch("/api/admin/media", {
-    method: "POST",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: fd,
-  });
+  vorbereitet.forEach((f) => fd.append("files[]", f));
+
+  let res: Response;
+  try {
+    res = await apiFetch("/api/admin/media", {
+      method: "POST",
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      body: fd,
+    });
+  } catch {
+    throw new Error("Der Server war nicht erreichbar. Bitte die Internetverbindung prüfen "
+      + "und es erneut versuchen.");
+  }
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.message || "Upload fehlgeschlagen");
+    throw new Error(await errorMessage(res, "Der Upload wurde abgelehnt."));
   }
   return res.json();
 }
