@@ -140,7 +140,7 @@ Sekunden – danach ist die Seite vollständig da.
 | „Das Bild konnte nicht umgewandelt werden…"           | Die Meldung nennt die technischen Gründe – bitte vollständig an den Hoster oder die Entwicklung weitergeben.         |
 | „Der Ordner uploads/neu/ ist nicht beschreibbar."     | Schreibrechte für `uploads/` setzen (755 bzw. 775).                                                                 |
 | „Die Datei ist zu groß für den Server."               | Schritt 4: `upload_max_filesize` und `post_max_size` erhöhen. Betrifft vor allem PDFs – Fotos verkleinert der Browser selbst. |
-| „…iPhone-Format HEIC…"                                | Am iPhone unter Einstellungen → Kamera → Formate **Maximale Kompatibilität** wählen. Dann macht das iPhone JPG-Fotos. |
+| „…iPhone-Format HEIC…"                                | Am iPhone unter Einstellungen → Kamera → Formate **Maximale Kompatibilität** wählen – oder die Fotos mit Safari statt Chrome hochladen. |
 
 Technische Fehlerdetails schreibt PHP ins Fehlerprotokoll des Servers
 (im Timme-Panel unter „Logfiles"). Besucher sehen davon nie etwas.
@@ -355,13 +355,29 @@ Redakteure müssen nichts beachten und können Fotos direkt vom Handy hochladen.
 Nur animierte GIFs bleiben unverändert.
 
 Fotos über 1 MB verkleinert schon der Browser, bevor er sie losschickt – auf
-dieselben 1600 px, die der Server ohnehin herstellt. Das hat drei Gründe: Ein
+dieselben 1600 px, die der Server ohnehin herstellt. Das hat zwei Gründe: Ein
 15-MB-Foto vom Handy überschreitet auf manchen Servern die zulässige
-Anfragegröße und würde ohne verständliche Meldung abgewiesen; über Mobilfunk
-dauert das Hochladen sonst unnötig lange; und iPhone-Fotos im Format HEIC, die
-PHP nicht lesen kann, werden dabei gleich in JPG umgewandelt. Kann der Browser
-das Bild nicht öffnen, schickt er die Originaldatei – dann übernimmt wie bisher
-der Server.
+Anfragegröße und würde ohne verständliche Meldung abgewiesen; und über
+Mobilfunk dauert das Hochladen sonst unnötig lange. Kann der Browser das Bild
+nicht öffnen, schickt er die Originaldatei – dann übernimmt wie bisher der
+Server.
+
+### iPhone-Fotos (Format HEIC)
+
+Neuere iPhones speichern Fotos standardmäßig als **HEIC**. PHP kann dieses
+Format nicht lesen. Wie sich das auswirkt, hängt am Browser:
+
+- **Safari** wandelt das Foto beim Auswählen selbst in JPG um. Hochladen
+  funktioniert ohne weiteres Zutun.
+- **Chrome am iPhone** reicht die HEIC-Datei durch – oft sogar unter dem Namen
+  `image.jpg`, obwohl HEIC darin steht. Die Seite erkennt das am Inhalt der
+  Datei und bricht sofort mit einer Meldung ab, statt minutenlang Daten zu
+  schicken, die der Server nicht verwerten kann.
+
+Dauerhaft lösen lässt sich das am Gerät: **Einstellungen → Kamera → Formate →
+Maximale Kompatibilität**. Dann nimmt das iPhone JPG-Fotos auf, und jeder
+Browser funktioniert. Wer nichts umstellen möchte, lädt die Fotos mit Safari
+hoch.
 
 ## Besucherstatistik
 

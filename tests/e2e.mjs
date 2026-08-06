@@ -873,7 +873,7 @@ try {
   check("Mediathek weiterhin abrufbar", (await api("/admin/media", { token: token0 })).status === 200);
 
   // =======================================================================
-  group("19. Große Handy-Fotos");
+  group("19. Große Handy-Fotos und iPhone-Format HEIC");
   // =======================================================================
   // Ein Foto vom Handy ist schnell 15 MB groß. Viele Server weisen so große
   // Anfragen ab, bevor PHP sie überhaupt sieht – dann käme nur ein
@@ -919,6 +919,33 @@ try {
     `${Math.round((anfrageBytes ?? 0) / 1024)} KB statt ${Math.round(originalBytes / 1024)} KB`,
   );
   console.log(`    gesendet: ${Math.round((anfrageBytes ?? 0) / 1024)} KB statt ${Math.round(originalBytes / 1024)} KB`);
+
+  // Chrome am iPhone reicht HEIC-Dateien durch und nennt sie trotzdem
+  // „image.jpg". Erkannt werden muss das am Inhalt, und zwar bevor minutenlang
+  // Daten geschickt werden, die der Server ohnehin nicht lesen kann.
+  const heicDatei = path.join(TMP, "image.jpg");
+  writeFileSync(heicDatei, Buffer.concat([
+    Buffer.from([0, 0, 0, 0x18]),
+    Buffer.from("ftypheic\0\0\0\0heicmif1", "latin1"),
+    Buffer.alloc(64),
+  ]));
+
+  let heicUploadVersucht = false;
+  const merkeHeicUpload = (req) => {
+    if (req.method() === "POST" && decodeURIComponent(req.url()).includes("/admin/media")) {
+      heicUploadVersucht = true;
+    }
+  };
+  page.on("request", merkeHeicUpload);
+  await page.setInputFiles('[data-testid="input-gallery-editor-upload"]', heicDatei);
+  const heicMeldung = await waitFor(
+    async () => /HEIC/.test(await page.locator("body").innerText()),
+    { timeout: 20000 },
+  );
+  page.off("request", merkeHeicUpload);
+  check("HEIC wird trotz Endung .jpg erkannt", heicMeldung);
+  check("Die Meldung nennt den Ausweg", /Maximale Kompatibilität|Safari/.test(await page.locator("body").innerText()));
+  check("Die Datei wird gar nicht erst hochgeladen", !heicUploadVersucht);
 
   const neuestes = (await api("/admin/media", { token: token0 })).body[0];
   const geladen = await fetch(`${BASE}${neuestes.url}`);
