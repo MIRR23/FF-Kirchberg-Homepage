@@ -134,6 +134,133 @@ export function GalleryField({
 // Öffentliche Anzeige
 // ---------------------------------------------------------------------------
 
+interface LightboxProps {
+  images: string[];
+  /** Index des angezeigten Bildes */
+  index: number;
+  onIndex: (i: number) => void;
+  onClose: () => void;
+  title: string;
+  testId: string;
+}
+
+/**
+ * Großansicht über der Seite. Geblättert wird mit den Pfeilen oder der
+ * Tastatur, Escape schließt. Wird vom Hauptbild und von der Galerie benutzt.
+ */
+function Lightbox({ images, index, onIndex, onClose, title, testId }: LightboxProps) {
+  const zeigen = (i: number) => onIndex(((i % images.length) + images.length) % images.length);
+
+  // Bewusst ohne Abhängigkeitsliste: Der Handler muss den aktuellen Index
+  // kennen, sonst blättert die Tastatur immer vom ersten Bild aus weiter.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowRight") zeigen(index + 1);
+      if (e.key === "ArrowLeft") zeigen(index - 1);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Bild ${index + 1} von ${images.length}`}
+      data-testid={`${testId}-lightbox`}
+    >
+      <img
+        src={withBase(images[index])}
+        alt={`${title} – Bild ${index + 1} von ${images.length}`}
+        className="max-h-full max-w-full rounded-lg object-contain"
+        onClick={(e) => e.stopPropagation()}
+      />
+      <button
+        type="button"
+        onClick={onClose}
+        aria-label="Schließen"
+        data-testid={`button-${testId}-close`}
+        className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
+      >
+        <X className="h-5 w-5" />
+      </button>
+      {images.length > 1 && (
+        <>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); zeigen(index - 1); }}
+            aria-label="Vorheriges Bild"
+            className="absolute left-2 rounded-full bg-white/10 p-2 text-white hover:bg-white/20 md:left-6"
+          >
+            <ChevronLeft className="h-6 w-6" />
+          </button>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); zeigen(index + 1); }}
+            aria-label="Nächstes Bild"
+            data-testid={`button-${testId}-next`}
+            className="absolute right-2 rounded-full bg-white/10 p-2 text-white hover:bg-white/20 md:right-6"
+          >
+            <ChevronRight className="h-6 w-6" />
+          </button>
+          <span className="absolute bottom-5 rounded-full bg-black/60 px-3 py-1 text-sm text-white/90">
+            {index + 1} / {images.length}
+          </span>
+        </>
+      )}
+    </div>
+  );
+}
+
+interface LeadImageProps {
+  /** Pfad unterhalb von /uploads/ */
+  image: string | null | undefined;
+  title: string;
+  testId?: string;
+}
+
+/**
+ * Das Hauptbild eines Beitrags, groß über dem Text. Ein Klick zeigt es
+ * bildschirmfüllend – auf dem Handy ist das der einzige Weg, Details zu
+ * erkennen.
+ */
+export function LeadImage({ image, title, testId = "post-lead-image" }: LeadImageProps) {
+  const [offen, setOffen] = useState(false);
+  if (!image) return null;
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOffen(true)}
+        aria-label="Bild groß anzeigen"
+        data-testid={`button-${testId}`}
+        className="mt-6 block w-full overflow-hidden rounded-2xl border border-border transition-opacity hover:opacity-95"
+      >
+        <img
+          src={withBase(image)}
+          alt={title}
+          data-testid={testId}
+          className="max-h-[32rem] w-full bg-secondary object-cover"
+        />
+      </button>
+      {offen && (
+        <Lightbox
+          images={[image]}
+          index={0}
+          onIndex={() => {}}
+          onClose={() => setOffen(false)}
+          title={title}
+          testId={testId}
+        />
+      )}
+    </>
+  );
+}
+
 interface ImageGalleryProps {
   /** JSON-Liste aus der Datenbank */
   images: string;
@@ -141,29 +268,19 @@ interface ImageGalleryProps {
   title: string;
   heading?: string;
   testId?: string;
+  /** Bild, das an anderer Stelle schon groß zu sehen ist (Hauptbild) */
+  exclude?: string | null;
 }
 
 /**
  * Bilderreihe mit Großansicht. Ein Klick öffnet das Bild groß; geblättert
  * wird mit den Pfeilen oder der Tastatur, Escape schließt.
  */
-export function ImageGallery({ images, title, heading = "Bilder", testId = "post-gallery" }: ImageGalleryProps) {
+export function ImageGallery({
+  images, title, heading = "Bilder", testId = "post-gallery", exclude,
+}: ImageGalleryProps) {
   const [offen, setOffen] = useState<number | null>(null);
-  const liste = parseImages(images);
-
-  const zeigen = (i: number) => setOffen(((i % liste.length) + liste.length) % liste.length);
-
-  // Tastatursteuerung, solange ein Bild groß angezeigt wird
-  useEffect(() => {
-    if (offen === null) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOffen(null);
-      if (e.key === "ArrowRight") setOffen((i) => (i === null ? i : (i + 1) % liste.length));
-      if (e.key === "ArrowLeft") setOffen((i) => (i === null ? i : (i - 1 + liste.length) % liste.length));
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [offen, liste.length]);
+  const liste = parseImages(images).filter((url) => url !== exclude);
 
   if (!liste.length) return null;
 
@@ -175,7 +292,7 @@ export function ImageGallery({ images, title, heading = "Bilder", testId = "post
           <button
             key={url}
             type="button"
-            onClick={() => zeigen(i)}
+            onClick={() => setOffen(i)}
             data-testid={`button-${testId}-image-${i}`}
             className="overflow-hidden rounded-xl border border-border transition-opacity hover:opacity-90"
           >
@@ -190,54 +307,14 @@ export function ImageGallery({ images, title, heading = "Bilder", testId = "post
       </div>
 
       {offen !== null && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
-          onClick={() => setOffen(null)}
-          role="dialog"
-          aria-modal="true"
-          aria-label={`Bild ${offen + 1} von ${liste.length}`}
-          data-testid={`${testId}-lightbox`}
-        >
-          <img
-            src={withBase(liste[offen])}
-            alt={`${title} – Bild ${offen + 1} von ${liste.length}`}
-            className="max-h-full max-w-full rounded-lg object-contain"
-            onClick={(e) => e.stopPropagation()}
-          />
-          <button
-            type="button"
-            onClick={() => setOffen(null)}
-            aria-label="Schließen"
-            data-testid={`button-${testId}-close`}
-            className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white hover:bg-white/20"
-          >
-            <X className="h-5 w-5" />
-          </button>
-          {liste.length > 1 && (
-            <>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); zeigen(offen - 1); }}
-                aria-label="Vorheriges Bild"
-                className="absolute left-2 rounded-full bg-white/10 p-2 text-white hover:bg-white/20 md:left-6"
-              >
-                <ChevronLeft className="h-6 w-6" />
-              </button>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); zeigen(offen + 1); }}
-                aria-label="Nächstes Bild"
-                data-testid={`button-${testId}-next`}
-                className="absolute right-2 rounded-full bg-white/10 p-2 text-white hover:bg-white/20 md:right-6"
-              >
-                <ChevronRight className="h-6 w-6" />
-              </button>
-              <span className="absolute bottom-5 rounded-full bg-black/60 px-3 py-1 text-sm text-white/90">
-                {offen + 1} / {liste.length}
-              </span>
-            </>
-          )}
-        </div>
+        <Lightbox
+          images={liste}
+          index={offen}
+          onIndex={setOffen}
+          onClose={() => setOffen(null)}
+          title={title}
+          testId={testId}
+        />
       )}
     </section>
   );

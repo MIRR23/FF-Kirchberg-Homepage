@@ -15,7 +15,7 @@
  *   PLAYWRIGHT=/pfad/zu/playwright/index.mjs node tests/e2e.mjs
  */
 
-import { readFileSync, writeFileSync, mkdtempSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdtempSync, existsSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
@@ -118,6 +118,25 @@ async function api(route, { method = "GET", token, json, form, ua, ip } = {}) {
     body = text;
   }
   return { status: res.status, body, headers: res.headers };
+}
+
+/**
+ * Erzeugt ein Foto in der Größe, wie sie heutige Handys liefern (gut 13 MB).
+ *
+ * Das Rauschen ist Absicht: Ein gleichmäßiger Verlauf ließe sich so stark
+ * zusammenpacken, dass die Datei winzig wäre und nichts prüfen würde.
+ */
+function makeHugePhoto() {
+  const file = path.join(TMP, "handy-foto.jpg");
+  execFileSync("php", [
+    "-r",
+    `mt_srand(7);$w=4000;$h=3000;$im=imagecreatetruecolor($w,$h);
+     for($y=0;$y<$h;$y+=4){for($x=0;$x<$w;$x+=4){
+       $c=imagecolorallocate($im,mt_rand(0,255),mt_rand(0,255),mt_rand(0,255));
+       imagefilledrectangle($im,$x,$y,$x+3,$y+3,$c);}}
+     imagejpeg($im,'${file}',92);`,
+  ]);
+  return file;
 }
 
 /** Erzeugt ein großes Testfoto mit EXIF-Drehung und GPS-Position. */
@@ -379,6 +398,24 @@ try {
   // Beitrag ist öffentlich sichtbar
   check("Neuer Beitrag öffentlich sichtbar", contains(await gotoPage(page, `/beitrag/${created.slug}`, { expect: "E2E Einsatz" }), "E2E Einsatz mit großem Foto"));
 
+  // Das Hauptbild gehört auf die Beitragsseite – nicht nur in die Übersicht
+  await page.waitForSelector('[data-testid="post-lead-image"]', { timeout: 10000 });
+  const leadSrc = await page.locator('[data-testid="post-lead-image"]').getAttribute("src");
+  check("Hauptbild steht auf der Beitragsseite", (leadSrc ?? "").endsWith(featured), `${leadSrc}`);
+  check(
+    "Hauptbild ist wirklich geladen",
+    await page.evaluate(() => {
+      const img = document.querySelector('[data-testid="post-lead-image"]');
+      return !!img && img.complete && img.naturalWidth > 0;
+    }),
+  );
+  await page.click('[data-testid="button-post-lead-image"]');
+  await page.waitForSelector('[data-testid="post-lead-image-lightbox"]', { timeout: 10000 });
+  check("Klick zeigt das Hauptbild groß", await page.locator('[data-testid="post-lead-image-lightbox"]').isVisible());
+  await page.keyboard.press("Escape");
+  await page.waitForTimeout(300);
+  check("Escape schließt das große Hauptbild", (await page.locator('[data-testid="post-lead-image-lightbox"]').count()) === 0);
+
   // =======================================================================
   group("7. Kartenstandort setzen und anzeigen");
   // =======================================================================
@@ -635,10 +672,14 @@ try {
   check("Galerie wurde gespeichert", galerie.length === 3, JSON.stringify(galerie).slice(0, 90));
   check("Galerie enthält die gewählten Bestandsbilder", galerie.includes(bildA) && galerie.includes(bildB));
 
-  // Öffentliche Anzeige samt Vergrößern
+  // Öffentliche Anzeige samt Vergrößern. Das Hauptbild liegt ebenfalls in der
+  // Mediathek und kann dabei mit ausgewählt worden sein – dann steht es oben
+  // groß und nicht noch einmal als Kachel.
   await gotoPage(page, `/beitrag/${created.slug}`, { expect: "Bilder" });
+  const erwarteteKacheln = galerie.filter((url) => url !== featured).length;
   const kachelnOeffentlich = await page.locator('[data-testid^="button-post-gallery-image-"]').count();
-  check("Galerie erscheint auf der Beitragsseite", kachelnOeffentlich === 3, `${kachelnOeffentlich}`);
+  check("Galerie erscheint auf der Beitragsseite", kachelnOeffentlich === erwarteteKacheln,
+    `${kachelnOeffentlich} statt ${erwarteteKacheln}`);
   await page.click('[data-testid="button-post-gallery-image-0"]');
   await page.waitForSelector('[data-testid="post-gallery-lightbox"]', { timeout: 10000 });
   check("Klick vergrößert das Bild", await page.locator('[data-testid="post-gallery-lightbox"]').isVisible());
@@ -648,6 +689,19 @@ try {
   await page.keyboard.press("Escape");
   await page.waitForTimeout(400);
   check("Escape schließt die Großansicht", (await page.locator('[data-testid="post-gallery-lightbox"]').count()) === 0);
+
+  // Steht das Hauptbild auch in der Galerie, darf es nicht doppelt erscheinen
+  const mitTitelbild = Array.from(new Set([...galerie, featured]));
+  await fetch(`${BASE}/api.php?r=${encodeURIComponent(`/admin/posts/${created.id}`)}&_method=PATCH`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token0}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ images: mitTitelbild }),
+  });
+  await gotoPage(page, `/beitrag/${created.slug}`, { expect: "Bilder" });
+  const kachelnOhneDoppel = await page.locator('[data-testid^="button-post-gallery-image-"]').count();
+  check("Hauptbild erscheint in der Galerie nicht doppelt", kachelnOhneDoppel === mitTitelbild.length - 1,
+    `${kachelnOhneDoppel} von ${mitTitelbild.length}`);
+  check("Hauptbild steht weiterhin oben", (await page.locator('[data-testid="post-lead-image"]').count()) === 1);
 
   // Fremde Adressen werden abgewiesen
   const fremd = await fetch(`${BASE}/api.php?r=${encodeURIComponent(`/admin/posts/${created.id}`)}&_method=PATCH`, {
@@ -819,7 +873,62 @@ try {
   check("Mediathek weiterhin abrufbar", (await api("/admin/media", { token: token0 })).status === 200);
 
   // =======================================================================
-  group("19. Keine Fehler im Browser");
+  group("19. Große Handy-Fotos");
+  // =======================================================================
+  // Ein Foto vom Handy ist schnell 15 MB groß. Viele Server weisen so große
+  // Anfragen ab, bevor PHP sie überhaupt sieht – dann käme nur ein
+  // nichtssagendes „Upload fehlgeschlagen" zurück. Deshalb verkleinert der
+  // Browser das Foto vorher; der Server begrenzt ohnehin auf 1600 px.
+  const handyFoto = makeHugePhoto();
+  const originalBytes = statSync(handyFoto).size;
+  check("Testfoto ist so groß wie ein Handy-Foto", originalBytes > 8 * 1024 * 1024,
+    `${Math.round(originalBytes / 1024 / 1024)} MB`);
+
+  await gotoPageRaw(page, `/intern/beitraege/${created.id}`);
+  await page.waitForSelector('[data-testid="input-post-title"]', { timeout: 15000 });
+  const bilderVorher = await page.locator('[data-testid="gallery-editor"] img').count();
+
+  // Gemessen wird, was die Anwendung an fetch übergibt – also genau die
+  // Dateien nach dem Verkleinern.
+  await page.evaluate(() => {
+    const original = window.fetch;
+    window.__uploadBytes = null;
+    window.fetch = (input, init) => {
+      if (init?.body instanceof FormData) {
+        let summe = 0;
+        for (const [, wert] of init.body.entries()) {
+          if (wert instanceof File) summe += wert.size;
+        }
+        if (summe > 0) window.__uploadBytes = summe;
+      }
+      return original(input, init);
+    };
+  });
+
+  await page.setInputFiles('[data-testid="input-gallery-editor-upload"]', handyFoto);
+  const angekommen = await waitFor(
+    async () => (await page.locator('[data-testid="gallery-editor"] img').count()) === bilderVorher + 1,
+    { timeout: 60000 },
+  );
+  const anfrageBytes = await page.evaluate(() => window.__uploadBytes);
+
+  check("Großes Handy-Foto wird angenommen", angekommen);
+  check(
+    "Foto wird schon im Browser verkleinert",
+    anfrageBytes !== null && anfrageBytes > 0 && anfrageBytes < originalBytes / 4,
+    `${Math.round((anfrageBytes ?? 0) / 1024)} KB statt ${Math.round(originalBytes / 1024)} KB`,
+  );
+  console.log(`    gesendet: ${Math.round((anfrageBytes ?? 0) / 1024)} KB statt ${Math.round(originalBytes / 1024)} KB`);
+
+  const neuestes = (await api("/admin/media", { token: token0 })).body[0];
+  const geladen = await fetch(`${BASE}${neuestes.url}`);
+  const kopie = path.join(TMP, "handy-ergebnis" + path.extname(neuestes.url));
+  writeFileSync(kopie, Buffer.from(await geladen.arrayBuffer()));
+  const masse = execFileSync("php", ["-r", `$i=getimagesize('${kopie}'); echo $i[0]."x".$i[1];`], { encoding: "utf8" });
+  check("Ergebnis ist auf 1600 px begrenzt", Math.max(...masse.split("x").map(Number)) === 1600, masse);
+
+  // =======================================================================
+  group("20. Keine Fehler im Browser");
   // =======================================================================
   // Externe Ressourcen (Schriftarten, Kartenkacheln) sind in der Testumgebung
   // ohne Internetzugang nicht erreichbar – das sind keine Fehler der Anwendung.

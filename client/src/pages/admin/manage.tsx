@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Plus, Trash2, Pencil, Upload, Loader2, Copy, ShieldCheck, FileText, RefreshCw } from "lucide-react";
 import type { Page, MediaItem, SafeUser, PermissionArea, DocumentItem, SiteSettings } from "@shared/schema";
 import { PERMISSION_AREAS } from "@shared/schema";
-import { useAuth, authRequest, uploadFiles, withBase, apiFetch, fileUrl } from "@/lib/auth";
+import { useAuth, authRequest, uploadFiles, withBase, apiFetch, fileUrl, errorMessage } from "@/lib/auth";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -233,8 +233,7 @@ async function sendDocumentForm(token: string | null, method: string, url: strin
     body: fd,
   });
   if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.message || "Upload fehlgeschlagen");
+    throw new Error(await errorMessage(res, "Der Upload wurde abgelehnt."));
   }
   return res.json();
 }

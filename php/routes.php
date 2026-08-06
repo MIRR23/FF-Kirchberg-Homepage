@@ -745,7 +745,7 @@ function ffk_handle_media_upload(array $user): never
         // Nur echte Bilder annehmen (Typ aus dem Dateiinhalt, nicht aus dem Browser)
         $info = @getimagesize($f['tmp_name']);
         if ($info === false || !in_array((string) ($info['mime'] ?? ''), FFK_IMAGE_MIME_TYPES, true)) {
-            $gruende[] = sprintf('„%s“: keine Bilddatei (erlaubt sind JPG, PNG, GIF, WebP).', $f['name']);
+            $gruende[] = sprintf('„%s“: %s', $f['name'], ffk_describe_unreadable_image($f['tmp_name']));
             continue;
         }
 

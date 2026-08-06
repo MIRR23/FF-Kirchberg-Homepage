@@ -139,6 +139,8 @@ Sekunden – danach ist die Seite vollständig da.
 | „Auf dem Server fehlt die Bildbearbeitung…"           | Beim Hoster die PHP-Erweiterung **gd** (oder **imagick**) aktivieren lassen.                                        |
 | „Das Bild konnte nicht umgewandelt werden…"           | Die Meldung nennt die technischen Gründe – bitte vollständig an den Hoster oder die Entwicklung weitergeben.         |
 | „Der Ordner uploads/neu/ ist nicht beschreibbar."     | Schreibrechte für `uploads/` setzen (755 bzw. 775).                                                                 |
+| „Die Datei ist zu groß für den Server."               | Schritt 4: `upload_max_filesize` und `post_max_size` erhöhen. Betrifft vor allem PDFs – Fotos verkleinert der Browser selbst. |
+| „…iPhone-Format HEIC…"                                | Am iPhone unter Einstellungen → Kamera → Formate **Maximale Kompatibilität** wählen. Dann macht das iPhone JPG-Fotos. |
 
 Technische Fehlerdetails schreibt PHP ins Fehlerprotokoll des Servers
 (im Timme-Panel unter „Logfiles"). Besucher sehen davon nie etwas.
@@ -281,6 +283,10 @@ für die betreffende IP-Adresse vorübergehend.
 - **Beiträge & Einsätze:** Titel, Kategorie, Einsatzstichwort/-ort, Datum, Titelbild, Text mit
   Bild-Upload direkt im Editor. Entwürfe möglich. Beiträge erscheinen automatisch auf
   Startseite, in „Aktuelles", „Einsätze" und im Jahres-Archiv.
+- **Titelbild:** Es steht in der Übersicht auf der Kachel und auf der
+  Beitragsseite groß über dem Text. Ein Klick zeigt es bildschirmfüllend.
+  Ist dasselbe Bild zusätzlich unter „Weitere Bilder" eingetragen, erscheint es
+  trotzdem nur einmal.
 - **Mehrere Bilder je Beitrag und Fahrzeug:** Unter dem Titelbild gibt es den
   Bereich **Weitere Bilder**. Dort lassen sich beliebig viele Fotos hinzufügen – neu
   hochladen oder mit **Aus Mediathek** aus den bereits vorhandenen Bildern
@@ -347,6 +353,15 @@ jedem Fall. Klappt gar nichts, nennt die Meldung die konkreten Gründe und was
 der Server kann; dieser Text lässt sich direkt an den Hoster weitergeben.
 Redakteure müssen nichts beachten und können Fotos direkt vom Handy hochladen.
 Nur animierte GIFs bleiben unverändert.
+
+Fotos über 1 MB verkleinert schon der Browser, bevor er sie losschickt – auf
+dieselben 1600 px, die der Server ohnehin herstellt. Das hat drei Gründe: Ein
+15-MB-Foto vom Handy überschreitet auf manchen Servern die zulässige
+Anfragegröße und würde ohne verständliche Meldung abgewiesen; über Mobilfunk
+dauert das Hochladen sonst unnötig lange; und iPhone-Fotos im Format HEIC, die
+PHP nicht lesen kann, werden dabei gleich in JPG umgewandelt. Kann der Browser
+das Bild nicht öffnen, schickt er die Originaldatei – dann übernimmt wie bisher
+der Server.
 
 ## Besucherstatistik
 

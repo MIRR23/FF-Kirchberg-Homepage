@@ -150,6 +150,42 @@ function ffk_check_memory_for_image(int $breite, int $hoehe): void
 }
 
 /**
+ * Sagt, warum eine Datei nicht als Bild gelesen werden konnte.
+ *
+ * `getimagesize()` liefert nur „false" zurück. Für den, der das Foto gerade
+ * hochgeladen hat, ist „keine Bilddatei" aber keine Hilfe – vor allem beim
+ * iPhone-Format HEIC, das ganz normal wie ein Foto aussieht.
+ */
+function ffk_describe_unreadable_image(string $path): string
+{
+    $kopf = (string) @file_get_contents($path, false, null, 0, 16);
+
+    // HEIC/HEIF: ISO-Container, ab Byte 4 steht „ftyp", danach die Kennung
+    if (strlen($kopf) >= 12 && substr($kopf, 4, 4) === 'ftyp') {
+        $kennung = substr($kopf, 8, 4);
+        $heic = ['heic', 'heix', 'heim', 'heis', 'hevc', 'hevx', 'hevm', 'hevs', 'mif1', 'msf1'];
+        if (in_array($kennung, $heic, true)) {
+            return 'iPhone-Format HEIC – dieser Server kann es nicht lesen. Am iPhone unter '
+                . 'Einstellungen → Kamera → Formate „Maximale Kompatibilität" wählen, dann werden '
+                . 'Fotos als JPG aufgenommen.';
+        }
+    }
+    if (str_starts_with($kopf, '%PDF')) {
+        return 'das ist ein PDF. Dokumente gehören unter „Dokumente", nicht in die Mediathek.';
+    }
+    if (str_starts_with($kopf, 'II*') || str_starts_with($kopf, "MM\0*")) {
+        return 'Format TIFF – bitte vorher als JPG oder PNG speichern.';
+    }
+    if (str_starts_with($kopf, 'BM')) {
+        return 'Format BMP – bitte vorher als JPG oder PNG speichern.';
+    }
+    if (str_contains($kopf, '<svg') || str_starts_with($kopf, '<?xml')) {
+        return 'Format SVG – bitte vorher als PNG speichern.';
+    }
+    return 'keine Bilddatei (erlaubt sind JPG, PNG, GIF, WebP).';
+}
+
+/**
  * Optimiert ein Bild an Ort und Stelle.
  *
  * Probiert der Reihe nach jede vorhandene Bibliothek und jedes mögliche
