@@ -2,6 +2,57 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Schriften lokal ausliefern statt von api.fontshare.com nachzuladen.
+ * Grund: Ohne externen Abruf werden beim Seitenaufruf keine Besucherdaten
+ * (IP, Browser) an einen Drittanbieter übertragen – die Datenschutzerklärung
+ * ("bindet keine externen Dienste ein") stimmt damit wieder. Die Dateien
+ * liegen unter client/src/fonts/ und werden vom Build mit ins assets/-Paket
+ * aufgenommen. Nur die tatsächlich genutzten Schnitte sind hinterlegt.
+ */
+@font-face {
+  font-family: 'Clash Display';
+  src: url('./fonts/clashdisplay-500.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Clash Display';
+  src: url('./fonts/clashdisplay-600.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Clash Display';
+  src: url('./fonts/clashdisplay-700.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Satoshi';
+  src: url('./fonts/satoshi-400.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Satoshi';
+  src: url('./fonts/satoshi-500.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Satoshi';
+  src: url('./fonts/satoshi-700.woff2') format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* LIGHT MODE */
 :root {
   --button-outline: rgba(255, 255, 255, 0.1);

@@ -507,6 +507,8 @@ Docker-Image-Workflow) liegt im Branch **`nodejs-express-version`**.
 - **Termine:** Beispieltermine eingetragen – bitte anpassen.
 - **Impressum/Datenschutz:** Bitte auf Aktualität prüfen (insbesondere
   Anschrift/Verantwortliche).
-- **Schriftarten:** `index.html` lädt die Schriften von `api.fontshare.com`.
-  Wer sie datenschutzfreundlich lokal ausliefern möchte, legt die Dateien unter
-  `client/public/` ab und ersetzt den `<link>` – das ist unabhängig vom Backend.
+- **Schriftarten:** Die Schriften (Clash Display, Satoshi) werden lokal vom
+  eigenen Server ausgeliefert. Die Dateien liegen unter `client/src/fonts/` und
+  landen beim Build fertig im `assets/`-Ordner; beim Seitenaufruf wird kein
+  externer Dienst mehr kontaktiert (datenschutzfreundlich, keine Übertragung von
+  Besucherdaten an Dritte).
