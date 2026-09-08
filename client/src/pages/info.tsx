@@ -7,7 +7,7 @@ import { ImageGallery } from "@/components/gallery";
 import { LocationView } from "@/components/map";
 import { usePageTitle } from "@/lib/seo";
 import { formatDate, dayOfMonth, monthShort } from "@/lib/format";
-import { PublicLayout, EmptyState, useSiteSettings } from "@/components/site";
+import { PublicLayout, EmptyState, ErrorState, useSiteSettings } from "@/components/site";
 import { Skeleton } from "@/components/ui/skeleton";
 
 function PageTitle({ kicker, title, intro }: { kicker: string; title: string; intro?: string }) {
@@ -81,7 +81,7 @@ export function Geraetehaus() {
 // ---------- Über uns ----------
 export function UeberUns() {
   usePageTitle("Über uns");
-  const { data: page } = useQuery<Page>({ queryKey: ["/api/pages/ueber-uns"] });
+  const { data: page, isError: pageError } = useQuery<Page>({ queryKey: ["/api/pages/ueber-uns"] });
   const { data: members, isLoading } = useQuery<Member[]>({ queryKey: ["/api/members"] });
   const { data: site } = useSiteSettings();
 
@@ -92,7 +92,9 @@ export function UeberUns() {
     <PublicLayout>
       <div className="mx-auto max-w-6xl px-4 py-12 md:px-8 md:py-16">
         <PageTitle kicker="Über uns" title={page?.title || "Die Feuerwehr Kirchberg"} />
-        {page ? (
+        {pageError ? (
+          <ErrorState />
+        ) : page ? (
           <div className="prose-content max-w-3xl" dangerouslySetInnerHTML={{ __html: cleanHtml(page.content, { linksNewTab: site?.linksNewTab }) }} />
         ) : (
           <Skeleton className="h-40 max-w-3xl" />

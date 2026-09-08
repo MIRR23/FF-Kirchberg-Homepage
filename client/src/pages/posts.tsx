@@ -8,7 +8,7 @@ import { ImageGallery, LeadImage } from "@/components/gallery";
 import { LocationView } from "@/components/map";
 import { usePageTitle } from "@/lib/seo";
 import { formatDateLong, formatTime, yearOf } from "@/lib/format";
-import { PublicLayout, PostCard, EmptyState, CategoryBadge, useCategories, categoryById, useSiteSettings } from "@/components/site";
+import { PublicLayout, PostCard, EmptyState, ErrorState, CategoryBadge, useCategories, categoryById, useSiteSettings } from "@/components/site";
 import { Skeleton } from "@/components/ui/skeleton";
 
 function PageTitle({ kicker, title, intro }: { kicker: string; title: string; intro?: string }) {
@@ -44,7 +44,7 @@ function FilterChips({
   );
 }
 
-function PostGrid({ posts, loading }: { posts: Post[] | undefined; loading: boolean }) {
+function PostGrid({ posts, loading, error }: { posts: Post[] | undefined; loading: boolean; error?: boolean }) {
   const { data: categories } = useCategories();
   if (loading) {
     return (
@@ -53,6 +53,7 @@ function PostGrid({ posts, loading }: { posts: Post[] | undefined; loading: bool
       </div>
     );
   }
+  if (error) return <ErrorState />;
   if (!posts?.length) return <EmptyState text="Keine Beiträge gefunden." />;
   return (
     <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -71,7 +72,7 @@ export function Aktuelles() {
   const [shown, setShown] = useState(PAGE_SIZE);
   const { data: categories } = useCategories();
   const key = cat ? `/api/posts?category=${cat}` : "/api/posts";
-  const { data: posts, isLoading } = useQuery<Post[]>({ queryKey: [key] });
+  const { data: posts, isLoading, isError } = useQuery<Post[]>({ queryKey: [key] });
 
   const options = [
     { value: "", label: "Alle" },
@@ -87,7 +88,7 @@ export function Aktuelles() {
           intro="Alle Berichte unserer Feuerwehr – von Einsätzen über Übungen bis zu Veranstaltungen. Nach Kategorien filterbar."
         />
         <FilterChips options={options} value={cat} onChange={(v) => { setCat(v); setShown(PAGE_SIZE); }} />
-        <PostGrid posts={posts?.slice(0, shown)} loading={isLoading} />
+        <PostGrid posts={posts?.slice(0, shown)} loading={isLoading} error={isError} />
         {posts && posts.length > shown && (
           <div className="mt-10 text-center">
             <button
@@ -109,7 +110,7 @@ export function Einsaetze() {
   const [year, setYear] = useState("");
   const { data: years } = useQuery<string[]>({ queryKey: ["/api/posts/years"] });
   const key = `/api/posts?einsatz=1${year ? `&year=${year}` : ""}`;
-  const { data: posts, isLoading } = useQuery<Post[]>({ queryKey: [key] });
+  const { data: posts, isLoading, isError } = useQuery<Post[]>({ queryKey: [key] });
   const [shown, setShown] = useState(PAGE_SIZE);
 
   const options = [
@@ -126,7 +127,7 @@ export function Einsaetze() {
           intro="Brände, technische Hilfeleistungen und First-Responder-Einsätze der Feuerwehr Kirchberg."
         />
         <FilterChips options={options} value={year} onChange={(v) => { setYear(v); setShown(PAGE_SIZE); }} />
-        <PostGrid posts={posts?.slice(0, shown)} loading={isLoading} />
+        <PostGrid posts={posts?.slice(0, shown)} loading={isLoading} error={isError} />
         {posts && posts.length > shown && (
           <div className="mt-10 text-center">
             <button

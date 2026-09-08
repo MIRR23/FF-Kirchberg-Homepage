@@ -550,6 +550,20 @@ function ffk_handle_request(string $method, string $path): void
         ffk_require_permission($user, 'medien');
         $item = ffk_get_media((int) $seg[2]);
         if ($item !== null) {
+            // Wird das Bild noch verwendet? Dann nicht ungefragt löschen –
+            // sonst fehlt es plötzlich in Beiträgen, bei Fahrzeugen o. Ä.
+            // Mit ?force=1 lässt sich das Löschen bewusst erzwingen.
+            if (ffk_query('force') !== '1') {
+                $refs = ffk_find_media_references($item['url']);
+                if ($refs !== []) {
+                    $liste = implode(', ', array_slice($refs, 0, 5));
+                    if (count($refs) > 5) {
+                        $liste .= ' und weitere';
+                    }
+                    ffk_fail(409, 'Dieses Bild wird noch verwendet (' . $liste . '). '
+                        . 'Bitte erst dort entfernen oder das Löschen ausdrücklich bestätigen.');
+                }
+            }
             $rel = preg_replace('#^/uploads/#', '', $item['url']) ?? '';
             $fp = FFK_UPLOAD_DIR . '/' . $rel;
             if (is_file($fp) && ffk_path_within(FFK_UPLOAD_DIR, $fp)) {
@@ -749,7 +763,11 @@ function ffk_handle_media_upload(array $user): never
             continue;
         }
 
-        $filename = ffk_unique_filename($dir, $f['name']);
+        // Endung immer aus dem erkannten Bildtyp bilden, nie aus dem
+        // Browser-Dateinamen (sonst ließe sich z. B. eine .php-Datei mit
+        // GIF-Kopf hochladen und auf dem Server ausführen).
+        $ext = ffk_image_extension_for_mime((string) $info['mime']);
+        $filename = ffk_unique_filename_ext($dir, $f['name'], $ext);
         $dest = $dir . '/' . $filename;
         if (!ffk_move_uploaded($f['tmp_name'], $dest)) {
             $gruende[] = sprintf('„%s“: konnte nicht gespeichert werden (Schreibrechte in uploads/).', $f['name']);

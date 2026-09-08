@@ -23,6 +23,24 @@ const FFK_IMAGE_WEBP_QUALITY = 82;
 /** Erlaubte Bild-Typen beim Upload (wie bisher der multer-fileFilter). */
 const FFK_IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif'];
 
+/**
+ * Dateiendung passend zum erkannten Bildtyp – NIE aus dem Browser-Dateinamen
+ * übernehmen. Sonst könnte eine als Bild getarnte Datei mit der Endung .php
+ * (GIF-Kopf + PHP-Code) auf dem Server ausführbar liegen bleiben, weil GIFs
+ * unverändert durchgereicht werden. Die Endung folgt daher immer dem Inhalt.
+ */
+function ffk_image_extension_for_mime(string $mime): string
+{
+    return match ($mime) {
+        'image/jpeg' => 'jpg',
+        'image/png' => 'png',
+        'image/gif' => 'gif',
+        'image/webp' => 'webp',
+        'image/avif' => 'avif',
+        default => 'img',
+    };
+}
+
 /** true, wenn Imagick nutzbar ist. */
 function ffk_has_imagick(): bool
 {

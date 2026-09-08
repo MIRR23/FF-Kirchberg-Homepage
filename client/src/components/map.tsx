@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { MapPin, ExternalLink, Loader2, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -93,6 +93,12 @@ interface LocationFieldProps {
 export function LocationField({ lat, lng, onChange }: LocationFieldProps) {
   const hasPos = lat != null && lng != null;
   const [open, setOpen] = useState(hasPos);
+  // Beim Bearbeiten wird das Formular erst nach dem Laden befüllt; der
+  // gespeicherte Standort trifft also nach dem ersten Rendern ein. Dann das
+  // Kartenfeld aufklappen, damit der Redakteur nicht denkt, es sei keiner gesetzt.
+  useEffect(() => {
+    if (hasPos) setOpen(true);
+  }, [hasPos]);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<NominatimResult[] | null>(null);
   const [searching, setSearching] = useState(false);

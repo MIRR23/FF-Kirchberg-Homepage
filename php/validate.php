@@ -242,6 +242,11 @@ function ffk_validate_post(array $b, bool $partial): FfkValidation
         ffk_field_float_nullable($b, 'lat', $out),
         ffk_field_float_nullable($b, 'lng', $out),
     ];
+    // Veröffentlichungszeit auf lokale Zeit vereinheitlichen (siehe
+    // ffk_normalize_published_at) – nur wenn das Feld überhaupt gesetzt ist.
+    if (isset($out['publishedAt']) && is_string($out['publishedAt'])) {
+        $out['publishedAt'] = ffk_normalize_published_at($out['publishedAt']);
+    }
     // Defaults nur beim Anlegen setzen, bei PATCH keine Felder erfinden
     if ($partial) {
         $out = array_filter($out, static fn ($v, $k) => array_key_exists($k, $b), ARRAY_FILTER_USE_BOTH);
