@@ -64,6 +64,30 @@ function ffk_unique_filename(string $dir, string $originalName): string
     return $candidate;
 }
 
+/**
+ * Eindeutiger Dateiname mit vorgegebener Endung. Der Namensstamm stammt aus dem
+ * Browser-Dateinamen (nur zur Wiedererkennung), die Endung wird jedoch fest
+ * vorgegeben – so kann ein Angreifer keine ausführbare Endung (.php) schmuggeln.
+ */
+function ffk_unique_filename_ext(string $dir, string $originalName, string $ext): string
+{
+    // Endung des Originalnamens abschneiden, Rest säubern
+    $stem = preg_replace('/\.[^.]+$/', '', ffk_safe_filename($originalName)) ?? '';
+    $stem = trim($stem, '._');
+    if ($stem === '') {
+        $stem = 'bild';
+    }
+    $stem = mb_substr($stem, 0, 100, 'UTF-8');
+    $stamp = (string) (int) round(microtime(true) * 1000);
+    $candidate = $stamp . '_' . $stem . '.' . $ext;
+    $i = 1;
+    while (is_file($dir . '/' . $candidate)) {
+        $candidate = $stamp . '-' . $i . '_' . $stem . '.' . $ext;
+        $i++;
+    }
+    return $candidate;
+}
+
 /** JSON-Body der Anfrage als Array (leer, wenn kein/ungültiges JSON). */
 function ffk_body(): array
 {
@@ -91,6 +115,34 @@ function ffk_query(string $key): ?string
     return $v;
 }
 
+/**
+ * Vereinheitlicht den Veröffentlichungs-Zeitstempel auf lokale Zeit
+ * (Europe/Berlin) im Format Y-m-d\TH:i:s – genau wie die migrierten Beiträge.
+ *
+ * Warum: Der Editor schickt die Zeit als UTC (…Z). Würde man sie so speichern,
+ * lägen in der Datenbank zwei Formate nebeneinander; die String-Sortierung und
+ * der Jahresfilter (LIKE 'JJJJ-%') würden dann bei Einsätzen kurz nach
+ * Mitternacht das falsche Jahr liefern, und jedes erneute Speichern eines
+ * Beitrags verschöbe die Uhrzeit um die Zeitzonendifferenz. Durch die
+ * Umrechnung auf Ortszeit stimmen Sortierung, Filter und das Bearbeiten-Feld.
+ */
+function ffk_normalize_published_at(string $value): string
+{
+    $value = trim($value);
+    if ($value === '') {
+        return $value;
+    }
+    $berlin = new DateTimeZone('Europe/Berlin');
+    // Enthält der Wert eine Zeitzone (Z oder ±hh:mm), gilt sie; sonst als Ortszeit.
+    $hasZone = (bool) preg_match('/(Z|[+-]\d{2}:?\d{2})$/', $value);
+    try {
+        $dt = new DateTimeImmutable($value, $hasZone ? new DateTimeZone('UTC') : $berlin);
+    } catch (Exception $e) {
+        return $value; // Im Zweifel unverändert lassen – lieber roh als kaputt.
+    }
+    return $dt->setTimezone($berlin)->format('Y-m-d\TH:i:s');
+}
+
 /** Aktueller Zeitstempel im ISO-Format (wie new Date().toISOString() in JS). */
 function ffk_now_iso(): string
 {
@@ -111,11 +163,18 @@ function ffk_iso_ago(int $seconds): string
  */
 function ffk_client_ip(): string
 {
-    $fwd = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? '';
-    if (is_string($fwd) && $fwd !== '') {
-        $first = trim(explode(',', $fwd)[0]);
-        if ($first !== '' && filter_var($first, FILTER_VALIDATE_IP) !== false) {
-            return $first;
+    // X-Forwarded-For NUR auswerten, wenn in config.php ausdrücklich erlaubt.
+    // Sonst könnte jeder den Header selbst setzen und damit das Anmelde-
+    // Rate-Limit und die Besucherzählung aushebeln (der Header ist frei wählbar,
+    // REMOTE_ADDR nicht). Auf dem Timme-Hosting spricht der Client direkt mit
+    // dem Server – da ist REMOTE_ADDR korrekt und der Header darf ignoriert werden.
+    if (ffk_config('trust_forwarded_for', false)) {
+        $fwd = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? '';
+        if (is_string($fwd) && $fwd !== '') {
+            $first = trim(explode(',', $fwd)[0]);
+            if ($first !== '' && filter_var($first, FILTER_VALIDATE_IP) !== false) {
+                return $first;
+            }
         }
     }
     $remote = $_SERVER['REMOTE_ADDR'] ?? '';

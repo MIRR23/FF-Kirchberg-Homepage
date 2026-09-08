@@ -103,6 +103,11 @@ function storeToken(token: string | null) {
   }
 }
 
+// Wird beim ersten 401/403 einer angemeldeten Anfrage aufgerufen. So landet ein
+// Redakteur bei abgelaufener Sitzung auf der Anmeldemaske, statt leere Listen zu
+// sehen und zu glauben, seine Daten seien verschwunden. Registriert vom AuthProvider.
+let authExpiredHandler: (() => void) | null = null;
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<SafeUser | null>(null);
   const [token, setToken] = useState<string | null>(readStoredToken);
@@ -165,6 +170,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [token]);
 
+  // Bei abgelaufener Sitzung (401/403 aus einer angemeldeten Anfrage) abmelden.
+  useEffect(() => {
+    authExpiredHandler = () => {
+      storeToken(null);
+      setToken(null);
+      setUser(null);
+    };
+    return () => {
+      authExpiredHandler = null;
+    };
+  }, []);
+
   const can = useCallback(
     (area: PermissionArea) => {
       if (!user) return false;
@@ -207,6 +224,7 @@ export async function authRequest(
     body: data !== undefined ? JSON.stringify(data) : undefined,
   });
   if (!res.ok) {
+    if (res.status === 401 || res.status === 403) authExpiredHandler?.();
     const body = await res.json().catch(() => ({}));
     throw new Error(body.message || `${res.status}: Fehler bei der Anfrage`);
   }
@@ -273,6 +291,7 @@ export function authQueryFn(token: string | null) {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
     if (!res.ok) {
+      if (res.status === 401 || res.status === 403) authExpiredHandler?.();
       const body = await res.json().catch(() => ({}));
       throw new Error(body.message || `${res.status}`);
     }

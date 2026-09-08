@@ -163,9 +163,26 @@ export function AdminMedia() {
 
   const remove = async (id: number) => {
     if (!window.confirm("Bild wirklich löschen? Es wird ggf. in Beiträgen nicht mehr angezeigt.")) return;
-    await authRequest(token, "DELETE", `/api/admin/media/${id}`);
-    queryClient.invalidateQueries({ queryKey: ["/api/admin/media"] });
-    toast({ title: "Bild gelöscht" });
+    try {
+      await authRequest(token, "DELETE", `/api/admin/media/${id}`);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/media"] });
+      toast({ title: "Bild gelöscht" });
+    } catch (err: any) {
+      // Der Server meldet mit 409, wenn das Bild noch verwendet wird. Dann fragen,
+      // ob trotzdem gelöscht werden soll (dann per ?force=1 erzwingen).
+      const stillUsed = /verwendet/i.test(err.message ?? "");
+      if (stillUsed && window.confirm(err.message + "\n\nTrotzdem endgültig löschen?")) {
+        try {
+          await authRequest(token, "DELETE", `/api/admin/media/${id}?force=1`);
+          queryClient.invalidateQueries({ queryKey: ["/api/admin/media"] });
+          toast({ title: "Bild gelöscht" });
+        } catch (err2: any) {
+          toast({ title: "Löschen fehlgeschlagen", description: err2.message, variant: "destructive" });
+        }
+        return;
+      }
+      toast({ title: "Löschen fehlgeschlagen", description: err.message, variant: "destructive" });
+    }
   };
 
   const copyUrl = (url: string) => {

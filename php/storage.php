@@ -687,6 +687,52 @@ function ffk_set_setting(string $key, string $value): void
     );
 }
 
+/**
+ * Sucht, wo ein Bild noch verwendet wird (Titelbild, Galerie oder Text von
+ * Beiträgen und Fahrzeugen, Mitgliederfoto, Startseiten-Bild). Liefert
+ * verständliche Bezeichnungen der Fundstellen – damit ein noch benutztes Bild
+ * nicht unbemerkt aus der Mediathek gelöscht wird und Lücken auf der Seite reißt.
+ *
+ * @return list<string>
+ */
+function ffk_find_media_references(string $url): array
+{
+    if ($url === '') {
+        return [];
+    }
+    // Für LIKE die Sonderzeichen entschärfen (\, %, _), damit der Pfad wörtlich gesucht wird.
+    $needle = '%' . strtr($url, ['\\' => '\\\\', '%' => '\\%', '_' => '\\_']) . '%';
+    $found = [];
+
+    $posts = ffk_all(
+        "SELECT title FROM posts WHERE featured_image = ? OR images LIKE ? ESCAPE '\\\\' OR content LIKE ? ESCAPE '\\\\' ORDER BY published_at DESC",
+        [$url, $needle, $needle]
+    );
+    foreach ($posts as $p) {
+        $found[] = 'Beitrag „' . (string) $p['title'] . '“';
+    }
+
+    $vehicles = ffk_all(
+        "SELECT name FROM vehicles WHERE image = ? OR images LIKE ? ESCAPE '\\\\' OR description LIKE ? ESCAPE '\\\\'",
+        [$url, $needle, $needle]
+    );
+    foreach ($vehicles as $v) {
+        $found[] = 'Fahrzeug „' . (string) $v['name'] . '“';
+    }
+
+    $members = ffk_all('SELECT name FROM members WHERE image = ?', [$url]);
+    foreach ($members as $m) {
+        $found[] = 'Mitglied „' . (string) $m['name'] . '“';
+    }
+
+    $hero = ffk_get_setting('hero');
+    if ($hero !== null && str_contains($hero, $url)) {
+        $found[] = 'Startseiten-Bild';
+    }
+
+    return $found;
+}
+
 // ---------------------------------------------------------------------------
 // Besucherstatistik (anonyme Tagessummen)
 // ---------------------------------------------------------------------------

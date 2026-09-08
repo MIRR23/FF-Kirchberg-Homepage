@@ -246,3 +246,20 @@ export function EmptyState({ text }: { text: string }) {
     </div>
   );
 }
+
+/**
+ * Hinweis bei einem Ladefehler (Server/Datenbank kurz nicht erreichbar).
+ * Ohne diesen Weg blieben Ladeplatzhalter ewig stehen oder es erschiene
+ * fälschlich „nichts gefunden“ – beides verunsichert Besucher unnötig.
+ */
+export function ErrorState({
+  text = "Die Inhalte konnten gerade nicht geladen werden. Bitte die Seite später erneut aufrufen.",
+}: {
+  text?: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-dashed border-border py-14 text-center text-sm text-muted-foreground">
+      {text}
+    </div>
+  );
+}

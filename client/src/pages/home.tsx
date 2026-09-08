@@ -5,7 +5,7 @@ import type { Post, Event, HeroSettings } from "@shared/schema";
 import { DEFAULT_HERO_SETTINGS } from "@shared/schema";
 import { withBase } from "@/lib/auth";
 import { formatDate, dayOfMonth, monthShort } from "@/lib/format";
-import { PublicLayout, PostCard, SectionHead, EmptyState, useCategories, categoryById, renderHeroTitle } from "@/components/site";
+import { PublicLayout, PostCard, SectionHead, EmptyState, ErrorState, useCategories, categoryById, renderHeroTitle } from "@/components/site";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface Stats {
@@ -16,9 +16,9 @@ interface Stats {
 }
 
 export default function Home() {
-  const { data: latest } = useQuery<Post[]>({ queryKey: ["/api/posts?limit=6"] });
+  const { data: latest, isError: latestError } = useQuery<Post[]>({ queryKey: ["/api/posts?limit=6"] });
   const { data: einsaetze } = useQuery<Post[]>({ queryKey: ["/api/posts?einsatz=1&limit=4"] });
-  const { data: events } = useQuery<Event[]>({ queryKey: ["/api/events"] });
+  const { data: events, isError: eventsError } = useQuery<Event[]>({ queryKey: ["/api/events"] });
   const { data: stats } = useQuery<Stats>({ queryKey: ["/api/stats"] });
   const { data: categories } = useCategories();
   const { data: heroSettings } = useQuery<HeroSettings>({ queryKey: ["/api/settings/hero"] });
@@ -114,7 +114,9 @@ export default function Home() {
             </Link>
           }
         />
-        {!latest ? (
+        {latestError ? (
+          <ErrorState />
+        ) : !latest ? (
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {[0, 1, 2].map((i) => <Skeleton key={i} className="h-72 rounded-2xl" />)}
           </div>
@@ -140,7 +142,9 @@ export default function Home() {
               </Link>
             }
           />
-          {!events ? (
+          {eventsError ? (
+            <ErrorState />
+          ) : !events ? (
             <Skeleton className="h-24 rounded-2xl" />
           ) : upcoming.length === 0 ? (
             <EmptyState text="Aktuell sind keine Termine eingetragen." />

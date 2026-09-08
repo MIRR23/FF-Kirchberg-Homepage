@@ -102,9 +102,13 @@ export function AdminEvents() {
 
   const remove = async (id: number) => {
     if (!window.confirm("Termin wirklich löschen?")) return;
-    await authRequest(token, "DELETE", `/api/admin/events/${id}`);
-    queryClient.invalidateQueries({ queryKey: ["/api/events"] });
-    toast({ title: "Termin gelöscht" });
+    try {
+      await authRequest(token, "DELETE", `/api/admin/events/${id}`);
+      queryClient.invalidateQueries({ queryKey: ["/api/events"] });
+      toast({ title: "Termin gelöscht" });
+    } catch (err: any) {
+      toast({ title: "Löschen fehlgeschlagen", description: err.message, variant: "destructive" });
+    }
   };
 
   return (
@@ -229,9 +233,13 @@ export function AdminVehicles() {
 
   const remove = async (id: number) => {
     if (!window.confirm("Fahrzeug wirklich löschen?")) return;
-    await authRequest(token, "DELETE", `/api/admin/vehicles/${id}`);
-    queryClient.invalidateQueries({ queryKey: ["/api/vehicles"] });
-    toast({ title: "Fahrzeug gelöscht" });
+    try {
+      await authRequest(token, "DELETE", `/api/admin/vehicles/${id}`);
+      queryClient.invalidateQueries({ queryKey: ["/api/vehicles"] });
+      toast({ title: "Fahrzeug gelöscht" });
+    } catch (err: any) {
+      toast({ title: "Löschen fehlgeschlagen", description: err.message, variant: "destructive" });
+    }
   };
 
   return (
@@ -358,9 +366,13 @@ export function AdminMembers() {
 
   const remove = async (id: number) => {
     if (!window.confirm("Eintrag wirklich löschen?")) return;
-    await authRequest(token, "DELETE", `/api/admin/members/${id}`);
-    queryClient.invalidateQueries({ queryKey: ["/api/members"] });
-    toast({ title: "Eintrag gelöscht" });
+    try {
+      await authRequest(token, "DELETE", `/api/admin/members/${id}`);
+      queryClient.invalidateQueries({ queryKey: ["/api/members"] });
+      toast({ title: "Eintrag gelöscht" });
+    } catch (err: any) {
+      toast({ title: "Löschen fehlgeschlagen", description: err.message, variant: "destructive" });
+    }
   };
 
   // ---------- Reihenfolge ----------

@@ -29,6 +29,13 @@ return [
     // 'development' = ausführliche Fehlermeldungen, nur zum Testen verwenden.
     'app_env' => 'production',
 
+    // Nur auf true setzen, wenn die Seite HINTER einem eigenen Proxy/Loadbalancer
+    // läuft, der die echte Besucher-IP im Header X-Forwarded-For weiterreicht.
+    // Beim gewöhnlichen Timme-Hosting bitte auf false lassen: dort spricht der
+    // Browser direkt mit dem Server, und ein frei setzbarer Header dürfte weder
+    // das Anmelde-Limit noch die Besucherzählung beeinflussen.
+    'trust_forwarded_for' => false,
+
     // Automatische Erstbefüllung der Datenbank aus migration-data/ beim ersten
     // Aufruf. Nach der Ersteinrichtung kann das ruhig aktiviert bleiben – es
     // passiert nur etwas, solange noch kein einziger Benutzer existiert.
